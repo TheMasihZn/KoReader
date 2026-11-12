@@ -98,6 +98,11 @@ local started_once = false
 function AppLauncher:init()
     self:onDispatcherRegisterActions()
     self.ui.menu:registerToMainMenu(self)
+    -- "Open with…" in the long-press menu of files that apps can open.
+    local ok, FileHandlers = pcall(require, "apps/kos/filehandlers")
+    if ok and not self.ui.document then
+        FileHandlers:addFileDialogButton(self.ui)
+    end
     if not started_once and G_reader_settings:isTrue("applauncher_at_startup")
             and not self.ui.document then -- the file browser, not a book
         started_once = true

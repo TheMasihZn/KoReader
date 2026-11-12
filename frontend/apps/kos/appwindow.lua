@@ -43,6 +43,9 @@ local AppWindow = InputContainer:extend{
     build = nil,
     --- function(window); called once the window is closed
     on_close = nil,
+    --- function(window, do_close): optional; called instead of closing, so an app
+    -- can ask "Save changes?" first. Call do_close() to really close.
+    confirm_close = nil,
     --- show the Home button (goes back to the app launcher)
     home_button = true,
     covers_fullscreen = true, -- UIManager optimisation: nothing below needs repainting
@@ -138,7 +141,11 @@ function AppWindow:onScreenResize()
     UIManager:setDirty(self, "full")
 end
 
-function AppWindow:close()
+function AppWindow:close(force)
+    if self.confirm_close and not force then
+        self.confirm_close(self, function() self:close(true) end)
+        return
+    end
     UIManager:close(self)
     if self.on_close then
         self.on_close(self)
@@ -153,6 +160,14 @@ end
 
 --- Close this window and show the app launcher.
 function AppWindow:goHome()
+    if self.confirm_close then
+        -- Don't lose unsaved work: ask first, go home only once closed.
+        self.confirm_close(self, function()
+            self:close(true)
+            UIManager:nextTick(function() UIManager:broadcastEvent(Event:new("ShowAppLauncher")) end)
+        end)
+        return
+    end
     self:close()
     UIManager:nextTick(function()
         UIManager:broadcastEvent(Event:new("ShowAppLauncher"))

@@ -52,6 +52,7 @@ local Pane = InputContainer:extend{
     subtitle = nil,
     build = nil,
     on_close = nil,
+    confirm_close = nil,
     workspace = nil,
     rect = nil, -- Geom, absolute position on screen
 }
@@ -123,7 +124,11 @@ function Pane:setTitle(title, subtitle)
     self:refresh()
 end
 
-function Pane:close()
+function Pane:close(force)
+    if self.confirm_close and not force then
+        self.confirm_close(self, function() self:close(true) end)
+        return
+    end
     self.workspace:closePane(self)
 end
 
@@ -207,6 +212,7 @@ function Workspace:addPane(params, opts)
         subtitle = params.subtitle,
         build = params.build,
         on_close = params.on_close,
+        confirm_close = params.confirm_close,
         workspace = self,
     }
     local leaf = { pane = pane }

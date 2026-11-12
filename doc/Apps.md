@@ -49,6 +49,7 @@ local window = AppWindow:open{
         return MyContentWidget       -- lay out for exactly width × height
     end,
     on_close = function(window) end, -- optional
+    confirm_close = function(window, do_close) end, -- optional: ask "Save changes?", then call do_close()
 }
 window:refresh()                    -- rebuild after your state changed
 window:setTitle(title, subtitle)    -- update the title bar only
@@ -103,6 +104,29 @@ Every app that opens an `AppWindow` can also run in a window next to other apps.
 - **Any number of windows:** windows sit in a layout tree (`frontend/apps/kos/workspace.lua`), so splits can nest: side by side inside stacked, and so on. `Workspace:addPane(params, { next_to = pane, dir = "row" | "column" })` is the API.
 
 Apps that open their own full-screen KOReader screens (History, the Text editor and so on) still open full screen.
+
+## Opening files ("Open with")
+
+An app can claim file types. Those files then show up in Files, tapping one opens your app, and their long-press menu gets **Open with…**. Register from `init()`:
+
+```lua
+function MyApp:init()
+    local FileHandlers = require("apps/kos/filehandlers")
+    FileHandlers:register{
+        id = "myapp",
+        title = _("My app"),
+        extensions = { "md", "markdown" },
+        open = function(file) self:openFile(file) end,
+    }
+end
+```
+
+If several apps claim a type, or KOReader can also open it as a book, you're asked which one to use.
+
+## Office apps
+
+- **Sheets:** `.csv`, `.tsv` and `.xlsx`. A paged grid for e-ink (buttons or swipes move a whole screen). Tap a cell to see it, tap again or long-press to edit. Formulas: `=SUM(A1:A9)`, `=A1*B2`, `AVERAGE`, `MIN`, `MAX`, `COUNT`, `ABS`, `ROUND`. `.xlsx` is read-only: **Save sheet as CSV** to edit it. Asks before closing with unsaved changes.
+- **LaTeX view:** `.tex` files as formatted pages: title, sections, lists, tables, footnotes, theorems and math in Unicode (fractions, roots, sub- and superscripts, Greek, ℝ ℕ …). **Reload** re-reads the file, so you can edit the source in a window beside it. It isn't a TeX engine: custom macros and packages are skipped.
 
 ## Developer tools in KOReader OS
 
