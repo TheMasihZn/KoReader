@@ -107,8 +107,113 @@ end
 
 function FileManager:updateTitleBarPath(path)
     path = path or self.file_chooser.path
+    if G_reader_settings:nilOrTrue("fm_path_breadcrumbs") then
+        self.title_bar:setSubTitleSegments(self:getPathSegments(path))
+        return
+    end
     local text = self.folder_shortcuts:getShortcutFullName(path) or BD.directory(filemanagerutil.abbreviate(path))
     self.title_bar:setSubTitle(text)
+end
+
+--- Splits a folder path into breadcrumb segments, Windows Explorer style:
+-- "/" › "mnt" › "onboard" › "Books", or "Home" › "Manga" when the home folder is shortened.
+-- Segments above a locked home folder are shown but not tappable.
+function FileManager:getPathSegments(path)
+    local home_dir = filemanagerutil.getHomeFolder()
+    if home_dir ~= "/" then
+        home_dir = home_dir:gsub("/+$", "")
+    end
+    local segments = { { text = "/", path = "/" } }
+    local home_idx = home_dir == "/" and 1 or nil
+    local cur = ""
+    for part in path:gmatch("[^/]+") do
+        cur = cur .. "/" .. part
+        table.insert(segments, { text = part, path = cur })
+        if cur == home_dir then
+            home_idx = #segments
+        end
+    end
+    if home_idx then
+        if G_reader_settings:nilOrTrue("shorten_home_dir") then
+            local home_path = segments[home_idx].path
+            for _ = 1, home_idx do
+                table.remove(segments, 1)
+            end
+            table.insert(segments, 1, { text = _("Home"), path = home_path })
+        elseif G_reader_settings:isTrue("lock_home_folder") then
+            for i = 1, home_idx - 1 do
+                segments[i].path = nil
+            end
+        end
+    end
+    return segments
+end
+
+function FileManager:onBreadcrumbTap(path)
+    if path ~= self.file_chooser.path then
+        self.file_chooser:changeToPath(path)
+    end
+end
+
+--- Long-press on the path bar: type or paste a path to go there, like
+-- clicking into the Windows Explorer address bar.
+function FileManager:showGoToPathDialog()
+    local input_dialog
+    input_dialog = InputDialog:new{
+        title = _("Go to folder"),
+        input = self.file_chooser.path,
+        input_hint = "/mnt/onboard/Books",
+        buttons = {
+            {
+                {
+                    text = _("Cancel"),
+                    id = "close",
+                    callback = function()
+                        UIManager:close(input_dialog)
+                    end,
+                },
+                {
+                    text = _("Copy"),
+                    callback = function()
+                        Device.input.setClipboardText(self.file_chooser.path)
+                        UIManager:close(input_dialog)
+                    end,
+                },
+                {
+                    text = _("Go"),
+                    is_enter_default = true,
+                    callback = function()
+                        local target = util.trim(input_dialog:getInputText())
+                        if target == "" then return end
+                        if target == "~" or target:sub(1, 2) == "~/" then
+                            target = filemanagerutil.getHomeFolder() .. target:sub(2)
+                        elseif target:sub(1, 1) ~= "/" then
+                            target = self.file_chooser.path .. "/" .. target
+                        end
+                        if #target > 1 then
+                            target = target:gsub("/+$", "")
+                        end
+                        local mode = lfs.attributes(target, "mode")
+                        if mode == "directory" then
+                            UIManager:close(input_dialog)
+                            self.file_chooser:changeToPath(target)
+                        elseif mode == "file" then
+                            UIManager:close(input_dialog)
+                            local dir = target:match("(.*)/") or "/"
+                            self.file_chooser:changeToPath(dir ~= "" and dir or "/", target)
+                        else
+                            UIManager:show(InfoMessage:new{
+                                text = T(_("Folder not found:\n%1"), BD.dirpath(target)),
+                                icon = "notice-warning",
+                            })
+                        end
+                    end,
+                },
+            },
+        },
+    }
+    UIManager:show(input_dialog)
+    input_dialog:onShowKeyboard()
 end
 
 FileManager.onPathChanged = FileManager.updateTitleBarPath
@@ -124,6 +229,11 @@ function FileManager:setupLayout()
         subtitle = "",
         subtitle_truncate_left = true,
         subtitle_fullwidth = true,
+        subtitle_breadcrumb = {
+            callback = function(path) self:onBreadcrumbTap(path) end,
+            overflow_callback = function() self:onShowFolderMenu() end,
+            hold_callback = function() self:showGoToPathDialog() end,
+        },
         button_padding = Screen:scaleBySize(5),
         left_icon = "home",
         left_icon_size_ratio = 1,

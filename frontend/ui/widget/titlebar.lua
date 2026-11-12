@@ -39,6 +39,9 @@ local TitleBar = OverlapGroup:extend{
     subtitle_truncate_left = false, -- default with single line is to truncate right (set to true for a filepath)
     subtitle_fullwidth = false, -- true to allow subtitle to extend below the buttons
     subtitle_multilines = false, -- multilines if overflow
+    -- Show the subtitle as a tappable path (BreadcrumbWidget) instead of plain text.
+    -- Set to a table { callback = function(path), overflow_callback = function(), hold_callback = function() }
+    subtitle_breadcrumb = nil,
 
     info_text = nil, -- additional text displayed below bottom line
     info_text_face = Font:getFace("x_smallinfofont"),
@@ -205,7 +208,18 @@ function TitleBar:init()
 
     self.subtitle_widget = nil
     if self.subtitle then
-        if self.subtitle_multilines then
+        if self.subtitle_breadcrumb then
+            local BreadcrumbWidget = require("ui/widget/breadcrumbwidget")
+            self.subtitle_widget = BreadcrumbWidget:new{
+                segments = self._subtitle_segments or { { text = self.subtitle } },
+                face = self.subtitle_face,
+                max_width = subtitle_max_width,
+                lang = self.lang,
+                callback = self.subtitle_breadcrumb.callback,
+                overflow_callback = self.subtitle_breadcrumb.overflow_callback,
+                hold_callback = self.subtitle_breadcrumb.hold_callback,
+            }
+        elseif self.subtitle_multilines then
             self.subtitle_widget = TextBoxWidget:new{
                 text = self.subtitle,
                 alignment = self.align,
@@ -441,8 +455,24 @@ function TitleBar:setTitle(title, no_refresh)
 end
 
 function TitleBar:setSubTitle(subtitle, no_refresh)
+    self._subtitle_segments = nil
     if self.subtitle_widget and not self.subtitle_multilines then -- no TextBoxWidget:setText() available
         self.subtitle_widget:setText(subtitle)
+        if self.inner_subtitle_group then
+            self.inner_subtitle_group:resetLayout()
+        end
+        self.title_group:resetLayout()
+        if not no_refresh then
+            UIManager:setDirty(self.show_parent, "ui", self.dimen)
+        end
+    end
+end
+
+-- Only with subtitle_breadcrumb: segments is a list of { text = "...", path = "..." }
+function TitleBar:setSubTitleSegments(segments, no_refresh)
+    if self.subtitle_widget and self.subtitle_widget.setSegments then
+        self._subtitle_segments = segments -- in case we get re-init'ed
+        self.subtitle_widget:setSegments(segments)
         if self.inner_subtitle_group then
             self.inner_subtitle_group:resetLayout()
         end

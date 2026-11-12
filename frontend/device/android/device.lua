@@ -135,7 +135,69 @@ function Device:otaModel()
     return model, "link"
 end
 
+-- Split-screen / freeform window support.
+-- The launcher reports the size of the whole display, which is wrong as soon
+-- as we only get part of it (multi-window). Our native window knows its real
+-- size, so when it is smaller than the display, use that instead.
+local display_width, display_height -- the launcher's original functions
+
+local function getWindowSize()
+    local window = android.app.window
+    if window == nil then return end
+    local ok, w, h = pcall(function()
+        return android.lib.ANativeWindow_getWidth(window), android.lib.ANativeWindow_getHeight(window)
+    end)
+    if not ok or w <= 0 or h <= 0 then return end
+    return w, h
+end
+
+local function getMultiWindowSize()
+    local w, h = getWindowSize()
+    if not w then return end
+    -- A full-screen window covers at least the usable display area
+    -- (the display size minus the notch, if any).
+    if w < display_width() or h < display_height() then
+        return w, h
+    end
+end
+
+local function installWindowSizeHooks()
+    if display_width then return end -- once
+    display_width = android.getScreenWidth
+    display_height = android.getScreenHeight
+    android.getScreenWidth = function()
+        local w = getMultiWindowSize()
+        return w or display_width()
+    end
+    android.getScreenHeight = function()
+        local _, h = getMultiWindowSize()
+        return h or display_height()
+    end
+end
+
+Device._resize_listen_until = 0
+
+function Device:_checkWindowSize()
+    if android.screen.width == android.getScreenWidth()
+    and android.screen.height == android.getScreenHeight() then
+        return false
+    end
+    self.screen:resize()
+    local new_size = self.screen:getSize()
+    logger.info("Resizing screen to", new_size)
+    local FileManager = require("apps/filemanager/filemanager")
+    UIManager:broadcastEvent(Event:new("SetDimensions", new_size))
+    UIManager:broadcastEvent(Event:new("ScreenResize", new_size))
+    UIManager:broadcastEvent(Event:new("RedrawCurrentPage"))
+    if FileManager.instance then
+        FileManager.instance:reinit(FileManager.instance.path,
+            FileManager.instance.focused_file)
+    end
+    return true
+end
+
 function Device:init()
+    installWindowSizeHooks()
     self.screen = require("ffi/framebuffer_android"):new{device = self, debug = logger.dbg}
     self.powerd = require("device/android/powerd"):new{device = self}
 
@@ -153,25 +215,26 @@ function Device:init()
             elseif ev.code == C.APP_CMD_GAINED_FOCUS
                 or ev.code == C.APP_CMD_INIT_WINDOW
                 or ev.code == C.APP_CMD_WINDOW_REDRAW_NEEDED then
-                this.device.screen:_updateWindow()
+                -- The window surface may only get its new size shortly after a
+                -- configuration change (split-screen, freeform window resize).
+                if not (ev.code == C.APP_CMD_WINDOW_REDRAW_NEEDED
+                        and os.time() <= this.device._resize_listen_until
+                        and this.device:_checkWindowSize()) then
+                    this.device.screen:_updateWindow()
+                end
             elseif ev.code == C.APP_CMD_LOST_FOCUS
                 or ev.code == C.APP_CMD_TERM_WINDOW then
                 this.device.input:resetState()
             elseif ev.code == C.APP_CMD_CONFIG_CHANGED then
-                -- orientation and size changes
-                if android.screen.width ~= android.getScreenWidth()
-                or android.screen.height ~= android.getScreenHeight() then
-                    this.device.screen:resize()
-                    local new_size = this.device.screen:getSize()
-                    logger.info("Resizing screen to", new_size)
-                    local FileManager = require("apps/filemanager/filemanager")
-                    UIManager:broadcastEvent(Event:new("SetDimensions", new_size))
-                    UIManager:broadcastEvent(Event:new("ScreenResize", new_size))
-                    UIManager:broadcastEvent(Event:new("RedrawCurrentPage"))
-                    if FileManager.instance then
-                        FileManager.instance:reinit(FileManager.instance.path,
-                            FileManager.instance.focused_file)
-                    end
+                -- orientation and size changes, split-screen divider moved, freeform window resized
+                this.device._resize_listen_until = os.time() + 3
+                this.device:_checkWindowSize()
+            elseif ev.code == C.APP_CMD_WINDOW_RESIZED
+                or ev.code == C.APP_CMD_CONTENT_RECT_CHANGED then
+                -- Only follow-ups of a configuration change: the on-screen keyboard
+                -- must not make us relayout the whole UI.
+                if os.time() <= this.device._resize_listen_until then
+                    this.device:_checkWindowSize()
                 end
                 -- to-do: keyboard connected, disconnected
             elseif ev.code == C.APP_CMD_RESUME then
@@ -311,6 +374,8 @@ end
 
 function Device:UIManagerReady(uimgr)
     UIManager = uimgr
+    -- In case we were started directly in a split-screen window.
+    UIManager:nextTick(function() self:_checkWindowSize() end)
 end
 
 function Device:initNetworkManager(NetworkMgr)

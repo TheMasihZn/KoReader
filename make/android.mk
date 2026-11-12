@@ -104,6 +104,10 @@ update-apk: all
 	  --options='$(ANDROID_ASSETS_COMPRESSION)' \
 	  $(abspath $(ANDROID_ASSETS)/module/koreader.7z) \
 	  . '-x!libs' '-x!sdcv' $(release_excludes)
+	# Fork: let Android resize us in split-screen / freeform windows
+	# (upstream launcher marks the activity as non-resizeable).
+	sed -i 's/android:resizeableActivity="false"/android:resizeableActivity="true"/' \
+		$(ANDROID_LAUNCHER_DIR)/app/src/main/AndroidManifest.xml
 	$(ANDROID_LAUNCHER_DIR)/gradlew \
 		--project-dir='$(abspath $(ANDROID_LAUNCHER_DIR))' \
 		--project-cache-dir='$(abspath $(ANDROID_LAUNCHER_BUILD)/gradle)' \

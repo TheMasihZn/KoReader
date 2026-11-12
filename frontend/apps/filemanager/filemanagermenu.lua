@@ -336,6 +336,21 @@ function FileManagerMenu:setUpdateItemTable()
                         end,
                     },
                     {
+                        text = _("Show path as breadcrumbs"),
+                        checked_func = function()
+                            return G_reader_settings:nilOrTrue("fm_path_breadcrumbs")
+                        end,
+                        callback = function()
+                            G_reader_settings:flipNilOrTrue("fm_path_breadcrumbs")
+                            self.ui:updateTitleBarPath()
+                        end,
+                        help_text = _([[
+Show the current folder path below the title like the Windows Explorer address bar:
+`Home › Manga › Cells at Work`
+
+Tap a folder name to jump to it. Tap "…" to pick any parent folder. Long-press the path to type or paste a folder path.]]),
+                    },
+                    {
                         text = _("Shorten home folder"),
                         checked_func = function()
                             return G_reader_settings:nilOrTrue("shorten_home_dir")
