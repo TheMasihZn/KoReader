@@ -139,6 +139,13 @@ local function clockText()
 end
 
 local function dateText()
+    -- If Focus has a task (or a timer running), show that: it's what matters now.
+    local ok, PluginLoader = pcall(require, "pluginloader")
+    local focus = ok and PluginLoader:getPluginInstance("focus")
+    if focus and focus.getNowText then
+        local ok2, now = pcall(focus.getNowText, focus)
+        if ok2 and now then return now end
+    end
     local text = os.date("%A, %d %B")
     if Device:hasBattery() then
         local powerd = Device:getPowerDevice()

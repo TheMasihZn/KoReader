@@ -128,6 +128,15 @@ If several apps claim a type, or KOReader can also open it as a book, you're ask
 - **Sheets:** `.csv`, `.tsv` and `.xlsx`. A paged grid for e-ink (buttons or swipes move a whole screen). Tap a cell to see it, tap again or long-press to edit. Formulas: `=SUM(A1:A9)`, `=A1*B2`, `AVERAGE`, `MIN`, `MAX`, `COUNT`, `ABS`, `ROUND`. `.xlsx` is read-only: **Save sheet as CSV** to edit it. Asks before closing with unsaved changes.
 - **LaTeX view:** `.tex` files as formatted pages: title, sections, lists, tables, footnotes, theorems and math in Unicode (fractions, roots, sub- and superscripts, Greek, ℝ ℕ …). **Reload** re-reads the file, so you can edit the source in a window beside it. It isn't a TeX engine: custom macros and packages are skipped.
 
+## Accessibility
+
+- **Reading comfort:** dyslexia- and ADHD-friendly fonts (OpenDyslexic, Atkinson Hyperlegible, Lexend, Andika; all SIL OFL, licences in `plugins/readingcomfort.koplugin/fonts/`). Pick one for books, for menus and apps, or both. **Comfortable spacing** adds line, word and letter spacing and left-aligns text; turning it off restores your previous settings.
+- **Focus:** ADHD helpers.
+  - **Now:** one task broken into small steps you tick off. It also shows on the Home screen.
+  - **Focus timer:** 15, 25 or 45 minutes, then a break. Updates once a minute and keeps running while you read.
+  - **Jot it down:** an inbox (`koreader/focus-inbox.md`) for stray thoughts. Assign it to a gesture in Gestures › **Focus: jot it down**.
+  - **Break reminders while reading:** optional.
+
 ## Developer tools in KOReader OS
 
 **Built in, shown on the Home screen:**
