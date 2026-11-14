@@ -407,6 +407,19 @@ function Device:init()
         G_reader_settings:saveSetting("screen_dpi", DisplayProfiles.startupDPI(display_width(), display_height()))
     end)
     Generic.init(self)
+    -- Child processes (background rerendering, cover extraction, plugins…) must
+    -- end with _exit(): a plain exit() runs the GPU driver's exit-time cleanup,
+    -- which crashes on Samsung/Adreno devices (SIGSEGV in libGLESv2_adreno.so
+    -- under __cxa_finalize) and makes the parent think its helper died.
+    require("ffi/util").addRunInSubProcessAfterForkFunc("android_child_safe_exit", function()
+        local ffi = require("ffi")
+        os.exit = function(code)
+            pcall(io.stdout.flush, io.stdout)
+            pcall(io.stderr.flush, io.stderr)
+            if code == nil or code == true then code = 0 elseif code == false then code = 1 end
+            ffi.C._exit(tonumber(code) or 0)
+        end
+    end)
     -- dp/sp: size things by the screen's real density, not its size, so the
     -- interface doesn't stretch when a foldable unfolds (apps/kos/scaling.lua).
     local ok, err = pcall(function() require("apps/kos/scaling").install(self) end)
