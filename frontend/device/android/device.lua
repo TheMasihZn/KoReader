@@ -177,14 +177,40 @@ end
 
 Device._resize_listen_until = 0
 
+--- Size of the physical display (not our window): for per-screen DPI.
+function Device:getDisplaySize()
+    return display_width(), display_height()
+end
+
 function Device:_checkWindowSize()
-    if android.screen.width == android.getScreenWidth()
-    and android.screen.height == android.getScreenHeight() then
+    -- Folding / unfolding switches the physical display: apply its DPI first.
+    local dpi_changed = false
+    local ok, DisplayProfiles = pcall(require, "apps/kos/displayprofiles")
+    if ok and display_width then
+        local key = DisplayProfiles.key(display_width(), display_height())
+        if key ~= self._display_key then
+            local first = self._display_key == nil -- startup: DPI already applied in init
+            self._display_key = key
+            if not first then
+                dpi_changed = DisplayProfiles.onDisplayChanged(self, display_width(), display_height())
+            end
+        end
+    end
+    local size_changed = android.screen.width ~= android.getScreenWidth()
+        or android.screen.height ~= android.getScreenHeight()
+    if not size_changed and not dpi_changed then
         return false
     end
-    self.screen:resize()
+    if size_changed then
+        self.screen:resize()
+    end
     local new_size = self.screen:getSize()
-    logger.info("Resizing screen to", new_size)
+    logger.info("Resizing screen to", new_size, dpi_changed and "with new DPI" or "")
+    if dpi_changed then
+        -- Also resizes book text, which is in pixels.
+        DisplayProfiles.relayout(self)
+        return true
+    end
     local FileManager = require("apps/filemanager/filemanager")
     UIManager:broadcastEvent(Event:new("SetDimensions", new_size))
     UIManager:broadcastEvent(Event:new("ScreenResize", new_size))
@@ -369,6 +395,16 @@ function Device:init()
         android.setBackButtonIgnored(true)
     end
 
+    -- Per-screen DPI (foldables): start with the DPI stored for the screen in use.
+    pcall(function()
+        local DisplayProfiles = require("apps/kos/displayprofiles")
+        if DisplayProfiles.isEnabled() then
+            local want = DisplayProfiles.get(DisplayProfiles.key(display_width(), display_height()))
+            if want ~= nil then
+                G_reader_settings:saveSetting("screen_dpi", want ~= "auto" and want or nil)
+            end
+        end
+    end)
     Generic.init(self)
 end
 
