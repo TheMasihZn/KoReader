@@ -398,12 +398,7 @@ function Device:init()
     -- Per-screen DPI (foldables): start with the DPI stored for the screen in use.
     pcall(function()
         local DisplayProfiles = require("apps/kos/displayprofiles")
-        if DisplayProfiles.isEnabled() then
-            local want = DisplayProfiles.get(DisplayProfiles.key(display_width(), display_height()))
-            if want ~= nil then
-                G_reader_settings:saveSetting("screen_dpi", want ~= "auto" and want or nil)
-            end
-        end
+        G_reader_settings:saveSetting("screen_dpi", DisplayProfiles.startupDPI(display_width(), display_height()))
     end)
     Generic.init(self)
 end

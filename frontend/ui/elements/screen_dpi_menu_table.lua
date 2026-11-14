@@ -10,16 +10,20 @@ local function dpi() return Screen:getDPI() end
 local function custom() return G_reader_settings:readSetting("custom_screen_dpi") end
 
 local function setDPI(dpi_val)
+    -- KOReader OS: remembered for the screen in use (foldables get one DPI per
+    -- screen, switched automatically) and applied right away.
+    local ok, DisplayProfiles = pcall(require, "apps/kos/displayprofiles")
+    if ok and Device.getDisplaySize then
+        G_reader_settings:saveSetting("screen_dpi", dpi_val)
+        local w, h = Device:getDisplaySize()
+        DisplayProfiles.setForCurrentScreen(Device, w, h, dpi_val)
+        return
+    end
     local UIManager = require("ui/uimanager")
     local text = dpi_val and T(_("DPI set to %1. This will take effect after restarting."), dpi_val)
                or _("DPI set to auto. This will take effect after restarting.")
     -- If this is set to nil, reader.lua doesn't call setScreenDPI
     G_reader_settings:saveSetting("screen_dpi", dpi_val)
-    -- Per-screen DPI (foldables): remember it for the screen in use.
-    local ok, DisplayProfiles = pcall(require, "apps/kos/displayprofiles")
-    if ok and Device.getDisplaySize and DisplayProfiles.isEnabled() then
-        DisplayProfiles.set(DisplayProfiles.key(Device:getDisplaySize()), dpi_val)
-    end
     -- Passing a nil properly resets to defaults/auto
     Device:setScreenDPI(dpi_val)
     UIManager:askForRestart(text)
@@ -151,15 +155,5 @@ local menu = {
         },
     }
 }
-
--- KOReader OS: a DPI for each screen of a foldable (cover / unfolded).
-if Device.getDisplaySize then
-    local ok, DisplayProfiles = pcall(require, "apps/kos/displayprofiles")
-    if ok then
-        local items = DisplayProfiles.menuItems(Device, function() return Device:getDisplaySize() end)
-        menu.sub_item_table[#menu.sub_item_table].separator = true
-        for _, item in ipairs(items) do table.insert(menu.sub_item_table, item) end
-    end
-end
 
 return menu

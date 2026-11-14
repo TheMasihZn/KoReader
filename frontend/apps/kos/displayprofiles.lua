@@ -1,9 +1,10 @@
 --[[--
 A DPI for each screen, for foldables (Galaxy Fold: cover screen vs unfolded).
 
-When "Separate DPI for each screen" is on, the DPI you set is remembered for
-the screen you're using, and applied automatically when the device switches
-screens (folding / unfolding). It applies live, without a restart.
+Always on: the DPI you set (Screen DPI menu) is remembered for the screen
+you're using, and applied automatically when the device switches screens
+(folding / unfolding). A screen you never set a DPI for uses Auto.
+Changes apply live, without a restart.
 
 A screen is recognised by the shorter side of the physical display, which
 doesn't change with rotation, notches or split-screen.
@@ -16,9 +17,6 @@ local T = require("ffi/util").template
 
 local DisplayProfiles = {}
 
-function DisplayProfiles.isEnabled()
-    return G_reader_settings:isTrue("dpi_per_screen")
-end
 
 --- Key for a physical display size, e.g. "w900" (cover) or "w1810" (unfolded).
 function DisplayProfiles.key(display_w, display_h)
@@ -81,10 +79,30 @@ end
 --- Called when the screen changes: applies the stored DPI for the new screen.
 -- Returns true if the DPI changed (the caller then relayouts everything).
 function DisplayProfiles.onDisplayChanged(Device, display_w, display_h)
-    if not DisplayProfiles.isEnabled() then return false end
-    local want = DisplayProfiles.get(DisplayProfiles.key(display_w, display_h))
-    if want == nil then return false end -- never set for this screen: leave as is
+    local want = DisplayProfiles.get(DisplayProfiles.key(display_w, display_h)) or "auto"
     return DisplayProfiles.applyDPI(Device, want ~= "auto" and want or nil)
+end
+
+--- At startup: the DPI for the screen in use. A screen seen for the first time
+-- keeps the DPI already chosen (so updating doesn't change anything).
+-- Returns the DPI to use (number or nil for auto).
+function DisplayProfiles.startupDPI(display_w, display_h)
+    local key = DisplayProfiles.key(display_w, display_h)
+    local want = DisplayProfiles.get(key)
+    if want == nil then
+        local current = G_reader_settings:readSetting("screen_dpi")
+        DisplayProfiles.set(key, current)
+        return current
+    end
+    return want ~= "auto" and want or nil
+end
+
+--- The Screen DPI menu: set the DPI for the screen in use, live.
+function DisplayProfiles.setForCurrentScreen(Device, display_w, display_h, dpi)
+    DisplayProfiles.set(DisplayProfiles.key(display_w, display_h), dpi)
+    if DisplayProfiles.applyDPI(Device, dpi) then
+        DisplayProfiles.relayout(Device)
+    end
 end
 
 --- After a DPI change: rebuild the UI, and resize book text (it's in pixels).
@@ -107,70 +125,6 @@ function DisplayProfiles.relayout(Device)
         FileManager.instance:reinit(FileManager.instance.path, FileManager.instance.focused_file)
     end
     UIManager:setDirty("all", "full")
-end
-
---- Menu items for the Screen DPI menu.
--- getDisplaySize: function() -> w, h of the physical display
-function DisplayProfiles.menuItems(Device, getDisplaySize)
-    local UIManager = require("ui/uimanager")
-    local function current()
-        local w, h = getDisplaySize()
-        return DisplayProfiles.key(w, h), DisplayProfiles.label(w, h)
-    end
-    return {
-        {
-            text = _("Separate DPI for each screen (foldables)"),
-            help_text = _("For foldable phones and tablets: remember a DPI for the cover screen and another for the unfolded screen, and switch automatically when you fold or unfold. Set the DPI below while using each screen."),
-            checked_func = DisplayProfiles.isEnabled,
-            callback = function()
-                G_reader_settings:flipNilOrFalse("dpi_per_screen")
-                if DisplayProfiles.isEnabled() then
-                    -- Start from what's in use now on this screen.
-                    local key = current()
-                    if DisplayProfiles.get(key) == nil then
-                        DisplayProfiles.set(key, Device.screen.dpi_override)
-                    end
-                end
-            end,
-            separator = false,
-        },
-        {
-            text_func = function()
-                local key, label = current()
-                local v = DisplayProfiles.get(key)
-                local shown = v == nil and _("not set") or (v == "auto" and _("auto") or tostring(v))
-                return T(_("DPI for this screen, %1: %2"), label, shown)
-            end,
-            enabled_func = DisplayProfiles.isEnabled,
-            keep_menu_open = true,
-            callback = function(touchmenu_instance)
-                local SpinWidget = require("ui/widget/spinwidget")
-                local key, label = current()
-                local v = DisplayProfiles.get(key)
-                UIManager:show(SpinWidget:new{
-                    title_text = T(_("DPI for the %1"), label),
-                    info_text = _("Higher makes text, icons and buttons bigger. Applied right away."),
-                    value = (type(v) == "number" and v) or Device.screen:getDPI(),
-                    value_min = 90,
-                    value_max = 900,
-                    value_step = 10,
-                    value_hold_step = 50,
-                    ok_text = _("Set"),
-                    extra_text = _("Auto"),
-                    extra_callback = function()
-                        DisplayProfiles.set(key, nil)
-                        if DisplayProfiles.applyDPI(Device, nil) then DisplayProfiles.relayout(Device) end
-                        if touchmenu_instance then touchmenu_instance:updateItems() end
-                    end,
-                    callback = function(spin)
-                        DisplayProfiles.set(key, spin.value)
-                        if DisplayProfiles.applyDPI(Device, spin.value) then DisplayProfiles.relayout(Device) end
-                        if touchmenu_instance then touchmenu_instance:updateItems() end
-                    end,
-                })
-            end,
-        },
-    }
 end
 
 return DisplayProfiles
