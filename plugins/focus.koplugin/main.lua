@@ -509,6 +509,7 @@ function Focus:launchApp()
     end
     State.window = AppWindow:open{
         title = _("Focus"),
+        max_content_dp = 520, -- a calm column, not stretched across an unfolded screen
         build = function(window, width, height) return self:build(window, width, height) end,
         on_close = function() State.window = nil end,
     }

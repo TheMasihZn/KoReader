@@ -183,8 +183,13 @@ function Device:getDisplaySize()
 end
 
 function Device:_checkWindowSize()
-    -- Folding / unfolding switches the physical display: apply its DPI first.
+    -- Folding / unfolding switches the physical display: its density may differ,
+    -- and a DPI may be stored for it. Apply both first.
     local dpi_changed = false
+    local ok_s, Scaling = pcall(require, "apps/kos/scaling")
+    if ok_s and Scaling.refreshDensity(self) then
+        dpi_changed = true
+    end
     local ok, DisplayProfiles = pcall(require, "apps/kos/displayprofiles")
     if ok and display_width then
         local key = DisplayProfiles.key(display_width(), display_height())
@@ -192,7 +197,7 @@ function Device:_checkWindowSize()
             local first = self._display_key == nil -- startup: DPI already applied in init
             self._display_key = key
             if not first then
-                dpi_changed = DisplayProfiles.onDisplayChanged(self, display_width(), display_height())
+                dpi_changed = DisplayProfiles.onDisplayChanged(self, display_width(), display_height()) or dpi_changed
             end
         end
     end
@@ -207,7 +212,8 @@ function Device:_checkWindowSize()
     local new_size = self.screen:getSize()
     logger.info("Resizing screen to", new_size, dpi_changed and "with new DPI" or "")
     if dpi_changed then
-        -- Also resizes book text, which is in pixels.
+        -- Recompute shared sizes, rebuild the UI, resize book text (it's in pixels).
+        DisplayProfiles.refreshSizes()
         DisplayProfiles.relayout(self)
         return true
     end
@@ -401,6 +407,10 @@ function Device:init()
         G_reader_settings:saveSetting("screen_dpi", DisplayProfiles.startupDPI(display_width(), display_height()))
     end)
     Generic.init(self)
+    -- dp/sp: size things by the screen's real density, not its size, so the
+    -- interface doesn't stretch when a foldable unfolds (apps/kos/scaling.lua).
+    local ok, err = pcall(function() require("apps/kos/scaling").install(self) end)
+    if not ok then logger.warn("Scaling: not installed:", err) end
 end
 
 function Device:UIManagerReady(uimgr)

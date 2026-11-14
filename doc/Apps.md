@@ -56,6 +56,16 @@ window:setTitle(title, subtitle)    -- update the title bar only
 window:close()
 ```
 
+**Sizes are dp, text is sp.** On Android, KOReader OS sizes things by the screen's density, like Android's dp, instead of by the screen's size. A foldable therefore doesn't stretch when it opens. Use `Screen:scaleBySize(n)` for sizes as usual: it now means "n dp", including the user's **Interface size**. Fonts from `Font:getFace` also follow **Text size** (sp).
+
+**Don't stretch on wide screens.** Pass `max_content_dp = 560` (for example) to `AppWindow:open` and your content stays that wide, centred, when the window is wider. To change the layout itself, ask for the window size class (Android's compact, medium or expanded):
+
+```lua
+local Scaling = require("apps/kos/scaling")
+local class = Scaling.windowClass(width) -- "compact" (< 600dp), "medium", "expanded" (≥ 840dp)
+if class == "expanded" then --[[ two columns ]] end
+```
+
 **Resizing is handled for you.** `build` is called again whenever the screen changes: rotation, split-screen, a freeform window being resized, or the Fold opening or closing. Don't store sizes from `Screen:getWidth()` at startup. Always use the `width` and `height` you're given.
 
 ## Where an app shows up

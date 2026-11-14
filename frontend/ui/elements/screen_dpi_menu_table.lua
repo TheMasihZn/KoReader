@@ -156,4 +156,14 @@ local menu = {
     }
 }
 
+-- KOReader OS: Interface size (dp) and Text size (sp), first in the menu.
+do
+    local ok, Scaling = pcall(require, "apps/kos/scaling")
+    if ok and Scaling.installed then
+        menu.text = _("Screen size: dp, sp and DPI")
+        local items = Scaling.menuItems(Device)
+        for i = #items, 1, -1 do table.insert(menu.sub_item_table, 1, items[i]) end
+    end
+end
+
 return menu

@@ -42,6 +42,20 @@ local Screen = Device.screen
 
 local PRESETS = { 1/3, 1/2, 2/3 }
 
+-- On wide screens, keep content at a readable width instead of stretching it
+-- (Android's "expanded" layouts): max_content_dp, centred.
+local function contentWidth(width, max_dp)
+    if not max_dp then return width end
+    return math.min(width, Screen:scaleBySize(max_dp))
+end
+
+local function centred(content, width, content_w, height)
+    if not content or content_w >= width then return content end
+    local CenterContainer = require("ui/widget/container/centercontainer")
+    return CenterContainer:new{ dimen = Geom:new{ w = width, h = height }, ignore_if_over = "height", content }
+end
+
+
 ------------------------------------------------------------------------
 -- Pane: one window. Same API as AppWindow (refresh, setTitle, close),
 -- so app code can't tell the difference.
@@ -53,6 +67,7 @@ local Pane = InputContainer:extend{
     build = nil,
     on_close = nil,
     confirm_close = nil,
+    max_content_dp = nil,
     workspace = nil,
     rect = nil, -- Geom, absolute position on screen
 }
@@ -85,15 +100,16 @@ function Pane:_layout()
     }
     local content_h = inner_h - self.title_bar:getHeight()
     local content
+    local content_w = contentWidth(inner_w, self.max_content_dp)
     if self.build then
-        local ok, result = pcall(self.build, self, inner_w, content_h)
+        local ok, result = pcall(self.build, self, content_w, content_h)
         if ok then
-            content = result
+            content = centred(result, inner_w, content_w, content_h)
         else
             logger.err("Workspace: build failed for", self.title, result)
         end
     end
-    self.content_width, self.content_height = inner_w, content_h
+    self.content_width, self.content_height = content_w, content_h
     self[1] = FrameContainer:new{
         width = rect.w,
         height = rect.h,
@@ -213,6 +229,7 @@ function Workspace:addPane(params, opts)
         build = params.build,
         on_close = params.on_close,
         confirm_close = params.confirm_close,
+        max_content_dp = params.max_content_dp,
         workspace = self,
     }
     local leaf = { pane = pane }

@@ -36,6 +36,20 @@ local VerticalGroup = require("ui/widget/verticalgroup")
 local logger = require("logger")
 local Screen = Device.screen
 
+
+-- On wide screens, keep content at a readable width instead of stretching it
+-- (Android's "expanded" layouts): max_content_dp, centred.
+local function contentWidth(width, max_dp)
+    if not max_dp then return width end
+    return math.min(width, Screen:scaleBySize(max_dp))
+end
+
+local function centred(content, width, content_w, height)
+    if not content or content_w >= width then return content end
+    local CenterContainer = require("ui/widget/container/centercontainer")
+    return CenterContainer:new{ dimen = Geom:new{ w = width, h = height }, ignore_if_over = "height", content }
+end
+
 local AppWindow = InputContainer:extend{
     title = "",
     subtitle = nil,
@@ -48,6 +62,8 @@ local AppWindow = InputContainer:extend{
     confirm_close = nil,
     --- show the Home button (goes back to the app launcher)
     home_button = true,
+    --- optional: widest the content gets, in dp; wider windows centre it
+    max_content_dp = nil,
     covers_fullscreen = true, -- UIManager optimisation: nothing below needs repainting
 }
 
@@ -96,15 +112,16 @@ function AppWindow:_layout()
     }
     local content_height = height - self.title_bar:getHeight()
     local content
+    local content_w = contentWidth(width, self.max_content_dp)
     if self.build then
-        local ok, result = pcall(self.build, self, width, content_height)
+        local ok, result = pcall(self.build, self, content_w, content_height)
         if ok then
-            content = result
+            content = centred(result, width, content_w, content_height)
         else
             logger.err("AppWindow: build failed for", self.title, result)
         end
     end
-    self.content_width, self.content_height = width, content_height
+    self.content_width, self.content_height = content_w, content_height
     self[1] = FrameContainer:new{
         width = width,
         height = height,

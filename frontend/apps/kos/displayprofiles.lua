@@ -67,7 +67,8 @@ end
 --- Sets DPI now. dpi = number, or nil for auto. Returns true if it changed.
 function DisplayProfiles.applyDPI(Device, dpi)
     local Screen = Device.screen
-    local current = Screen.dpi_override
+    -- dpi_override is only a flag; the overriding value is Screen.dpi.
+    local current = Screen.dpi_override and Screen.dpi or nil
     if current == dpi then return false end
     G_reader_settings:saveSetting("screen_dpi", dpi) -- also used at the next start
     Device:setScreenDPI(dpi)
