@@ -23,6 +23,7 @@ local IconWidget = require("ui/widget/iconwidget")
 local InfoMessage = require("ui/widget/infomessage")
 local InputContainer = require("ui/widget/container/inputcontainer")
 local Size = require("ui/size")
+local TextBoxWidget = require("ui/widget/textboxwidget")
 local TextWidget = require("ui/widget/textwidget")
 local UIManager = require("ui/uimanager")
 local VerticalGroup = require("ui/widget/verticalgroup")
@@ -52,10 +53,18 @@ function AppTile:init()
         margin = 0,
         IconWidget:new(icon_args),
     }
-    local label = TextWidget:new{
+    -- Readable names: a proper size, up to two lines, centred, "…" only if longer.
+    local face = Font:getFace("cfont", 17)
+    local probe = TextWidget:new{ text = "Ag", face = face }
+    local line_h = probe:getSize().h
+    probe:free()
+    local label = TextBoxWidget:new{
         text = self.app.title,
-        face = Font:getFace("smallinfofont"),
-        max_width = self.width - 2 * Size.padding.small,
+        face = face,
+        width = self.width - 2 * Size.padding.small,
+        alignment = "center",
+        height = line_h * 2 + Size.padding.small,
+        height_overflow_show_ellipsis = true,
     }
     local group = VerticalGroup:new{
         align = "center",
@@ -230,7 +239,7 @@ function AppLauncher:buildGrid(window, width, height)
     local apps = AppRegistry:getApps()
     local margin = Size.padding.fullscreen
     local inner_w = width - 2 * margin
-    local min_tile_w = Screen:scaleBySize(96)
+    local min_tile_w = Screen:scaleBySize(112) -- room for names
     local cols = math.max(3, math.floor(inner_w / min_tile_w))
     local tile_w = math.floor(inner_w / cols)
     local icon_size = math.min(Screen:scaleBySize(36), math.floor(tile_w / 2))

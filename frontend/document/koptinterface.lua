@@ -625,7 +625,9 @@ Returned boxes are in native page coordinates zoomed at `1.0`.
 --]]
 function KoptInterface:getTextBoxes(doc, pageno)
     local text = doc:getPageTextBoxes(pageno)
-    if text and #text > 1 and doc.configurable.forced_ocr ~= 1 then
+    -- KOReader OS: a page whose text layer is a single line/block is still a
+    -- text page (was "#text > 1", which sent such pages to OCR).
+    if text and #text >= 1 and doc.configurable.forced_ocr ~= 1 then
         return text
     -- if we have no text in original page then we will reuse native word boxes
     -- in reflow mode and find text boxes from scratch in non-reflow mode

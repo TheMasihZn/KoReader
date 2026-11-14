@@ -735,7 +735,12 @@ function Workspace:showDividerMenu(d)
     UIManager:show(dialog)
 end
 
+-- Your Gestures keep working in split view too (apps/kos/gestureforward.lua).
 function Workspace:handleEvent(event)
+    return require("apps/kos/gestureforward").handle(self, event, Workspace._handleEvent)
+end
+
+function Workspace:_handleEvent(event)
     if event.handler == "onGesture" then
         local ges = event.args and event.args[1]
         if ges and (self:_handleDividerGesture(ges) or self:_handleMoveGesture(ges)) then

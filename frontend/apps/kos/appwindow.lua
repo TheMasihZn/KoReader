@@ -67,6 +67,11 @@ local AppWindow = InputContainer:extend{
     covers_fullscreen = true, -- UIManager optimisation: nothing below needs repainting
 }
 
+-- Your Gestures keep working while an app is open (apps/kos/gestureforward.lua).
+function AppWindow:handleEvent(event)
+    return require("apps/kos/gestureforward").handle(self, event, InputContainer.handleEvent)
+end
+
 --- Set by AppRegistry:launch() when the user chose "Open beside":
 -- the next window opened goes into the Workspace instead of full screen.
 AppWindow.pending_target = nil

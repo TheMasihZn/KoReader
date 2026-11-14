@@ -66,6 +66,8 @@ local class = Scaling.windowClass(width) -- "compact" (< 600dp), "medium", "expa
 if class == "expanded" then --[[ two columns ]] end
 ```
 
+**Gestures keep working.** Your gestures from Settings › Taps and gestures also work while an app is open, for example a corner long-press that opens a plugin. Long-press, multi-swipe and two-finger gestures that have an action assigned go to that action first. Taps and swipes go to your app first and are passed on only if your app doesn't use them (`apps/kos/gestureforward.lua`).
+
 **Resizing is handled for you.** `build` is called again whenever the screen changes: rotation, split-screen, a freeform window being resized, or the Fold opening or closing. Don't store sizes from `Screen:getWidth()` at startup. Always use the `width` and `height` you're given.
 
 ## Where an app shows up

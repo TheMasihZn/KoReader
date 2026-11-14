@@ -145,13 +145,16 @@ end
 -- Window
 ------------------------------------------------------------------------
 
+-- Every Studio window is its own session (open project, window), so you can
+-- have several side by side. Sessions inherit everything else from the plugin.
 function Studio:launchApp()
     AppWindow = AppWindow or require("apps/kos/appwindow")
-    self.project = nil
-    self.window = AppWindow:open{
+    local plugin = rawget(self, "_plugin") or self
+    local session = setmetatable({ _plugin = plugin, project = nil }, { __index = plugin })
+    session.window = AppWindow:open{
         title = _("Studio"),
-        build = function(window, width, height) return self:buildList(window, width, height) end,
-        on_close = function() self.window = nil end,
+        build = function(window, width, height) return session:buildList(window, width, height) end,
+        on_close = function() session.window = nil end,
     }
 end
 
@@ -234,7 +237,7 @@ function Studio:projectItems()
         table.insert(items, {
             text = rel,
             mandatory = util.getFriendlySize(size),
-            callback = function() self:editFile(root .. "/" .. rel) end,
+            callback = function() self:openFile(root .. "/" .. rel) end,
         })
     end
     return items
@@ -243,6 +246,34 @@ end
 ------------------------------------------------------------------------
 -- Actions
 ------------------------------------------------------------------------
+
+--- Files an app can open (CSV in Sheets, .tex in LaTeX view…): view or edit.
+function Studio:openFile(path)
+    local ok, FileHandlers = pcall(require, "apps/kos/filehandlers")
+    local handlers = ok and FileHandlers:forFile(path) or {}
+    if #handlers == 0 then
+        return self:editFile(path)
+    end
+    local dialog
+    local buttons = {}
+    for _, h in ipairs(handlers) do
+        table.insert(buttons, {{ text = T(_("View in %1"), h.title), callback = function()
+            UIManager:close(dialog)
+            -- In split view, open it beside this Studio window.
+            if self.window and self.window.workspace then
+                require("apps/kos/appwindow").pending_target = { next_to = self.window, dir = "row" }
+            end
+            FileHandlers:openWith(h, path)
+            require("apps/kos/appwindow").pending_target = nil
+        end }})
+    end
+    table.insert(buttons, {{ text = _("Edit as text"), callback = function()
+        UIManager:close(dialog)
+        self:editFile(path)
+    end }})
+    dialog = ButtonDialog:new{ title = path:match("([^/]+)$"), buttons = buttons }
+    UIManager:show(dialog)
+end
 
 function Studio:editFile(path)
     local editor = self.ui and self.ui.texteditor

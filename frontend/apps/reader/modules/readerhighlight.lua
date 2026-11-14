@@ -1982,6 +1982,44 @@ You can download language data files for Tesseract version 5.3.4 from https://te
 
 Copy the language data files (e.g., eng.traineddata for English and spa.traineddata for Spanish) into koreader/data/tessdata]])
 
+-- KOReader OS: no OCR on long-press. If the selection came back without text,
+-- read the words from the page's own text layer under it (PDF/DjVu with text).
+-- OCR only runs when the user turned on "Force OCR" for the document.
+function ReaderHighlight:_textFromTextLayer(page, pboxes)
+    local doc = self.ui.document
+    if not (page and pboxes and doc.getPageTextBoxes) then return "" end
+    local ok, lines = pcall(doc.getPageTextBoxes, doc, page)
+    if not ok or type(lines) ~= "table" then return "" end
+    local words = {}
+    for _, line in ipairs(lines) do
+        for _, w in ipairs(line) do
+            if w.word and w.word ~= "" and w.x0 then
+                for _, b in ipairs(pboxes) do
+                    if w.x1 > b.x and w.x0 < b.x + b.w and w.y1 > b.y and w.y0 < b.y + b.h then
+                        table.insert(words, w.word)
+                        break
+                    end
+                end
+            end
+        end
+    end
+    return table.concat(words, " ")
+end
+
+function ReaderHighlight:_noTextHere()
+    UIManager:show(InfoMessage:new{
+        text = _("No text under your finger here. Try a long-press right on a word, or drag to select a few words."),
+        timeout = 3,
+    })
+    UIManager:scheduleIn(G_defaults:readSetting("DELAY_CLEAR_HIGHLIGHT_S"), function()
+        self:clear()
+    end)
+end
+
+function ReaderHighlight:_useOCR()
+    return self.ui.document.configurable and self.ui.document.configurable.forced_ocr == 1
+end
+
 function ReaderHighlight:lookupDictWord()
     -- convert sboxes to word boxes
     local word_boxes = {}
@@ -1991,7 +2029,16 @@ function ReaderHighlight:lookupDictWord()
     -- if we extracted text directly
     if #self.selected_text.text > 0 then
         self.ui.dictionary:onLookupWord(self.selected_text.text, false, word_boxes, self, self.selected_link)
-    -- or we will do OCR
+    -- KOReader OS: from the text layer, not OCR
+    elseif self.selected_text.sboxes and not self:_useOCR() then
+        local text = self:_textFromTextLayer(self.hold_pos.page, self.selected_text.pboxes)
+        if text ~= "" then
+            self.selected_text.text = text
+            self.ui.dictionary:onLookupWord(text, false, word_boxes, self, self.selected_link)
+        else
+            self:_noTextHere()
+        end
+    -- or we will do OCR (only with "Force OCR")
     elseif self.selected_text.sboxes then
         local text = self.ui.document:getOCRText(self.hold_pos.page, self.selected_text.sboxes)
         if not text then
@@ -2047,7 +2094,16 @@ function ReaderHighlight:translate(index)
     end
     if #self.selected_text.text > 0 then
         self:onTranslateText(self.selected_text.text, index)
-    -- or we will do OCR
+    -- KOReader OS: from the text layer, not OCR
+    elseif self.hold_pos and not self:_useOCR() then
+        local text = self:_textFromTextLayer(self.hold_pos.page, self.selected_text.pboxes)
+        if text ~= "" then
+            self.selected_text.text = text
+            self:onTranslateText(text, index)
+        else
+            self:_noTextHere()
+        end
+    -- or we will do OCR (only with "Force OCR")
     elseif self.hold_pos then
         local text = self.ui.document:getOCRText(self.hold_pos.page, self.selected_text)
         logger.dbg("OCRed text:", text)
