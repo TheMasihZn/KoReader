@@ -350,7 +350,6 @@ function Overrides.install()
             tries = 0
         end
 
-        local state = readState()
         local replacements = {}
         local any = false
         for _, item in ipairs(Overrides.list()) do
@@ -365,7 +364,7 @@ function Overrides.install()
         end
         writeFile(marker, tostring(tries + 1))
 
-        local loaders = package.loaders or package.searchers
+        local loaders = package.loaders -- LuaJIT (Lua 5.1)
         table.insert(loaders, 2, function(name)
             local path = replacements[name:gsub("%.", "/")] or replacements[name]
             if not path then return nil end

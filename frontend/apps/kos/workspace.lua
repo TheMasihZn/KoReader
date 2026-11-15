@@ -448,6 +448,15 @@ function Workspace:onClose()
     return true
 end
 
+-- The rectangle a drop would fill, for the preview.
+local function dropRect(r, zone)
+    if zone == "left" then return r.x, r.y, math.floor(r.w / 2), r.h end
+    if zone == "right" then return r.x + math.floor(r.w / 2), r.y, r.w - math.floor(r.w / 2), r.h end
+    if zone == "top" then return r.x, r.y, r.w, math.floor(r.h / 2) end
+    if zone == "bottom" then return r.x, r.y + math.floor(r.h / 2), r.w, r.h - math.floor(r.h / 2) end
+    return r.x, r.y, r.w, r.h
+end
+
 function Workspace:paintTo(bb, x, y)
     bb:paintRect(x, y, self.dimen.w, self.dimen.h, Blitbuffer.COLOR_GRAY_E)
     for _, pane in ipairs(self) do
@@ -605,14 +614,6 @@ function Workspace:_dropZone(target, pos)
     return side
 end
 
--- The rectangle a drop would fill, for the preview.
-local function dropRect(r, zone)
-    if zone == "left" then return r.x, r.y, math.floor(r.w / 2), r.h end
-    if zone == "right" then return r.x + math.floor(r.w / 2), r.y, r.w - math.floor(r.w / 2), r.h end
-    if zone == "top" then return r.x, r.y, r.w, math.floor(r.h / 2) end
-    if zone == "bottom" then return r.x, r.y + math.floor(r.h / 2), r.w, r.h - math.floor(r.h / 2) end
-    return r.x, r.y, r.w, r.h
-end
 
 function Workspace:_titleBarAt(pos)
     if not pos or self.maximized then return end

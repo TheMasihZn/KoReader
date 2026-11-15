@@ -20,7 +20,6 @@ local Menu = require("ui/widget/menu")
 local Overrides = require("apps/kos/overrides")
 local UIManager = require("ui/uimanager")
 local WidgetContainer = require("ui/widget/container/widgetcontainer")
-local lfs = require("libs/libkoreader-lfs")
 local _ = require("gettext")
 local T = require("ffi/util").template
 

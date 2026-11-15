@@ -412,12 +412,12 @@ function Device:init()
     -- which crashes on Samsung/Adreno devices (SIGSEGV in libGLESv2_adreno.so
     -- under __cxa_finalize) and makes the parent think its helper died.
     require("ffi/util").addRunInSubProcessAfterForkFunc("android_child_safe_exit", function()
-        local ffi = require("ffi")
-        os.exit = function(code)
+        local c_ffi = require("ffi")
+        os.exit = function(code) -- luacheck: ignore 122
             pcall(io.stdout.flush, io.stdout)
             pcall(io.stderr.flush, io.stderr)
             if code == nil or code == true then code = 0 elseif code == false then code = 1 end
-            ffi.C._exit(tonumber(code) or 0)
+            c_ffi.C._exit(tonumber(code) or 0)
         end
     end)
     -- dp/sp: size things by the screen's real density, not its size, so the

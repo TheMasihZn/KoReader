@@ -177,8 +177,8 @@ local function dateText()
     local text = os.date("%A, %d %B")
     if Device:hasBattery() then
         local powerd = Device:getPowerDevice()
-        local ok, level = pcall(powerd.getCapacity, powerd)
-        if ok and level then
+        local ok_level, level = pcall(powerd.getCapacity, powerd)
+        if ok_level and level then
             text = T(_("%1 · Battery %2%"), text, level)
         end
     end
