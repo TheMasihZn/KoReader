@@ -115,6 +115,24 @@ Every app that opens an `AppWindow` can also run in a window next to other apps.
 - **Resize:** drag the divider between two windows. Tap it to cycle 1/3 · 1/2 · 2/3, or long-press it for equal sizes, swap or stack.
 - **Any number of windows:** windows sit in a layout tree (`frontend/apps/kos/workspace.lua`), so splits can nest: side by side inside stacked, and so on. `Workspace:addPane(params, { next_to = pane, dir = "row" | "column" })` is the API.
 
+## Several windows of one app
+
+Every app that opens an `AppWindow` can run in several windows at once. Its
+`launchApp()` is called again for each window, so keep per-window state on
+the window (or on a session table, as Studio does) and not in globals.
+
+- **New window:** Home → long-press the app → **Open** again, or a window's
+  menu → **New window of this app**. The second window is titled "App 2".
+- **Switch:** the **Windows** app on Home (or a gesture: "Open windows") lists
+  every open window. Tap one to bring it to the front. Long-press it to put a
+  full-screen window into the split view, open another, or close it.
+- In a full-screen window, long-press the Home button for the same menu.
+- `apps/kos/windows.lua` is the API: `Windows.list`, `Windows.raise(win)`,
+  `Windows.toSplit(win)`, `Windows.newInstance(win)`.
+
+An app that wants only one window (like Focus) can just refresh the open one
+in `launchApp()` instead of opening another.
+
 Apps that open their own full-screen KOReader screens (History, the Text editor and so on) still open full screen.
 
 ## Opening files ("Open with")

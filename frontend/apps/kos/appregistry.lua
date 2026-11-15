@@ -53,6 +53,9 @@ AppRegistry.builtins = {
     { id = "audio", title = _("Audio"), icon = "kos.audio", order = 9,
       description = _("Play again what any app read aloud (Gemma, messengers…). Plays through Bluetooth when connected."),
       launch = function() require("apps/kos/audiopipeline").showRecent() end },
+    { id = "windows", title = _("Windows"), icon = "column.two", order = 10,
+      description = _("All open app windows: switch between them, open another window of an app, or put them side by side."),
+      launch = function() require("apps/kos/windows").showSwitcher() end },
     { id = "settings", title = _("Settings"), icon = "appbar.settings", action = "show_menu", order = 20,
       description = _("The KOReader menu.") },
 }
@@ -164,6 +167,8 @@ function AppRegistry:launch(app, opts)
         return
     end
     AppWindow.pending_target = split
+    local Windows = require("apps/kos/windows")
+    Windows.launching_app = app.plugin and app or nil
     local ok, err = pcall(function()
         if app.wrapper_launch then
             app.wrapper_launch(app.plugin)
@@ -179,6 +184,7 @@ function AppRegistry:launch(app, opts)
     end)
     -- An app that didn't open an AppWindow must not leave the target armed.
     AppWindow.pending_target = nil
+    Windows.launching_app = nil
     if not ok then
         logger.err("AppRegistry: failed to launch", app.id, err)
         UIManager:show(InfoMessage:new{

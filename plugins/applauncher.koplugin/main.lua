@@ -123,6 +123,9 @@ function AppLauncher:onDispatcherRegisterActions()
     Dispatcher:registerAction("show_app_launcher", {
         category = "none", event = "ShowAppLauncher", title = _("Home screen"), general = true,
     })
+    Dispatcher:registerAction("show_open_windows", {
+        category = "none", event = "ShowOpenWindows", title = _("Open windows (switch app)"), general = true,
+    })
 end
 
 function AppLauncher:addToMainMenu(menu_items)
@@ -174,6 +177,11 @@ end
 
 -- @param args optional { split = { next_to = Pane, dir = "row"|"column" } }:
 -- the app picked next opens beside that window.
+function AppLauncher:onShowOpenWindows()
+    require("apps/kos/windows").showSwitcher()
+    return true
+end
+
 function AppLauncher:onShowAppLauncher(args)
     self.split_target = args and args.split or nil
     if self.window then
@@ -185,6 +193,7 @@ function AppLauncher:onShowAppLauncher(args)
         title = clockText(),
         subtitle = self.split_target and _("Pick an app for the new window") or dateText(),
         home_button = false,
+        in_switcher = false,
         build = function(window, width, height) return self:buildGrid(window, width, height) end,
         on_close = function()
             UIManager:unschedule(self.tick)
@@ -214,6 +223,14 @@ function AppLauncher:launch(app, split)
     end)
 end
 
+local function openCount(app)
+    local n = 0
+    for _, w in ipairs(require("apps/kos/windows").list) do
+        if w.kos_app and w.kos_app.id == app.id then n = n + 1 end
+    end
+    return n
+end
+
 function AppLauncher:showAppMenu(app)
     local dialog
     local can_split = AppRegistry:canSplit(app)
@@ -224,6 +241,11 @@ function AppLauncher:showAppMenu(app)
                 { text = _("Open"), callback = function()
                     UIManager:close(dialog)
                     self:launch(app)
+                end },
+                { text = T(_("Open windows (%1)"), openCount(app)), enabled = openCount(app) > 0, callback = function()
+                    UIManager:close(dialog)
+                    if self.window then self.window:close() end
+                    UIManager:nextTick(function() require("apps/kos/windows").showSwitcher() end)
                 end },
             },
             {

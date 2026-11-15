@@ -90,7 +90,7 @@ function Pane:_layout()
     local inner_h = rect.h - 2 * border
     self.title_bar = TitleBar:new{
         width = inner_w,
-        title = self.title,
+        title = require("apps/kos/windows").displayTitle(self),
         subtitle = self.subtitle,
         with_bottom_line = true,
         left_icon = "appbar.menu",
@@ -232,6 +232,7 @@ function Workspace:addPane(params, opts)
         max_content_dp = params.max_content_dp,
         workspace = self,
     }
+    require("apps/kos/windows").add(pane)
     local leaf = { pane = pane }
     -- "Beside/below this one" uses the focused window; otherwise split the
     -- largest window, so the screen fills up evenly in both directions.
@@ -322,6 +323,7 @@ function Workspace:closePane(pane)
     if not self.root then return end
     if self.maximized == pane then self.maximized = nil end
     if not self:_detach(pane) then return end
+    require("apps/kos/windows").remove(pane)
     if pane.on_close then
         pcall(pane.on_close, pane)
         pane.on_close = nil
@@ -419,6 +421,7 @@ end
 
 function Workspace:onCloseWidget()
     self.shown = false
+    for _, p in ipairs(self:getPanes()) do require("apps/kos/windows").remove(p) end
     if Workspace.instance == self then Workspace.instance = nil end
 end
 
@@ -831,6 +834,11 @@ function Workspace:showPaneMenu(pane)
                     self:relayout()
                 end) },
                 { text = _("Close"), callback = act(function() self:closePane(pane) end) },
+            },
+            {
+                { text = _("New window of this app"), enabled = pane.kos_app ~= nil,
+                  callback = act(function() require("apps/kos/windows").newInstance(pane) end) },
+                { text = _("All windows…"), callback = act(function() require("apps/kos/windows").showSwitcher() end) },
             },
             {
                 { text = _("Tidy all windows"), callback = act(function() self:tidy() end) },

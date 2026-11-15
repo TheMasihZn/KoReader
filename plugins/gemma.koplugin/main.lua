@@ -2,7 +2,10 @@
 Gemma: the phone side of the Gemma bridge (tools/gemma-bridge/gemma_bridge.py
 runs on the laptop, in front of Ollama).
 
-* Same conversation as the laptop: both read and write the bridge's "main" session.
+* Same conversation as the laptop: both read and write the bridge's sessions.
+* Several windows: each Gemma window shows one conversation. Open another
+  window (Home → hold Gemma, or the window menu) and pick or start a
+  different conversation there, or keep two windows on the same one.
 * Nothing gets lost: a message is kept in an outbox (on disk) until the laptop
   confirms it; resending is safe because each message carries its own id.
 * The conversation is cached on the phone, so it can be read offline.
@@ -32,18 +35,16 @@ local _ = require("gettext")
 local T = require("ffi/util").template
 
 local DISCOVERY_PORT = 47801
-local SESSION = "main"
 local POLL_FAST = 1.5   -- seconds, while connected
 local POLL_SLOW = 10    -- seconds, while the laptop can't be reached
 
--- One state shared by every Gemma window (several windows = same conversation).
+-- Shared by all Gemma windows. Conversations are kept per session id, so two
+-- windows on the same conversation show the same thing.
 local State = {
-    windows = {},
-    messages = {},  -- id -> message
-    rev = 0,
+    windows = {},   -- window -> true; each window has .gemma_sid
+    convs = {},     -- sid -> { messages = {id -> msg}, rev = n, busy = bool, title = "…" }
     online = nil,   -- nil = not tried yet, true/false
     status = nil,
-    busy = false,
     info = nil,
     polling = false,
 }
@@ -52,22 +53,38 @@ local store
 local function settings()
     if not store then
         store = LuaSettings:open(DataStorage:getSettingsDir() .. "/kos_gemma.lua")
-        -- the phone's cache of the conversation, for offline reading
-        for _, m in ipairs(store:readSetting("cache") or {}) do
-            State.messages[m.id] = m
+        -- older versions kept one conversation under "cache"
+        if store:readSetting("cache") and not store:readSetting("convs") then
+            store:saveSetting("convs", { main = { list = store:readSetting("cache"), rev = store:readSetting("cache_rev") or 0, title = "Main" } })
+            store:delSetting("cache"); store:delSetting("cache_rev")
         end
-        State.rev = store:readSetting("cache_rev") or 0
+        -- the phone's copy of each conversation, for offline reading
+        for sid, c in pairs(store:readSetting("convs") or {}) do
+            local conv = { messages = {}, rev = c.rev or 0, title = c.title }
+            for _, m in ipairs(c.list or {}) do conv.messages[m.id] = m end
+            State.convs[sid] = conv
+        end
     end
     return store
 end
 
-local function saveCache()
+local function conv(sid)
+    settings()
+    if not State.convs[sid] then
+        State.convs[sid] = { messages = {}, rev = 0 }
+    end
+    return State.convs[sid]
+end
+
+local function saveCache(sid)
+    local c = conv(sid)
     local list = {}
-    for _, m in pairs(State.messages) do table.insert(list, m) end
+    for _, m in pairs(c.messages) do table.insert(list, m) end
     table.sort(list, function(a, b) return a.id < b.id end)
     while #list > 300 do table.remove(list, 1) end
-    settings():saveSetting("cache", list)
-    settings():saveSetting("cache_rev", State.rev)
+    local all = settings():readSetting("convs") or {}
+    all[sid] = { list = list, rev = c.rev, title = c.title }
+    settings():saveSetting("convs", all)
     settings():flush()
 end
 
@@ -78,6 +95,11 @@ end
 
 local function newClientId()
     return string.format("phone-%d-%06d", os.time(), math.random(0, 999999))
+end
+
+local function convTitle(sid)
+    local c = State.convs[sid]
+    return (c and c.title) or (sid == "main" and _("Main") or sid)
 end
 
 ---------------------------------------------------------------------------
@@ -139,30 +161,44 @@ end
 -- Sync
 ---------------------------------------------------------------------------
 
-local function refreshWindows()
-    for w in pairs(State.windows) do w:refresh() end
+local function refreshWindows(sid)
+    for w in pairs(State.windows) do
+        if not sid or w.gemma_sid == sid then
+            if w.subtitle ~= convTitle(w.gemma_sid) then
+                w:setTitle(_("Gemma"), convTitle(w.gemma_sid))
+            end
+            w:refresh()
+        end
+    end
 end
 
 local function outbox()
     return settings():readSetting("outbox") or {}
 end
 
---- Sends what is waiting in the outbox. Each item keeps its client_id, so a
--- resend after a lost answer never doubles a message on the laptop.
+--- Sends what is waiting in the outbox (every conversation). Each item keeps
+-- its client_id, so a resend after a lost answer never doubles a message.
 local function flushOutbox()
     local box = outbox()
     local changed = false
     while box[1] do
         local item = box[1]
-        local res, err = request("POST", "/api/sessions/" .. SESSION .. "/messages",
+        local sid = item.sid or "main"
+        local res, err = request("POST", "/api/sessions/" .. sid .. "/messages",
             { text = item.text, from = "phone", client_id = item.client_id })
         if not res then
-            State.online, State.status = false, err
-            break
+            if err == "404" then
+                table.remove(box, 1) -- that conversation is gone on the laptop
+                changed = true
+            else
+                State.online, State.status = false, err
+                break
+            end
+        else
+            table.remove(box, 1)
+            changed = true
+            if res.message then conv(sid).messages[res.message.id] = res.message end
         end
-        table.remove(box, 1)
-        changed = true
-        if res.message then State.messages[res.message.id] = res.message end
     end
     if changed then
         settings():saveSetting("outbox", box)
@@ -170,9 +206,9 @@ local function flushOutbox()
     end
 end
 
-local function sync()
-    flushOutbox()
-    local res, err = request("GET", string.format("/api/sessions/%s/messages?since=%d", SESSION, State.rev))
+local function sync(sid)
+    local c = conv(sid)
+    local res, err = request("GET", string.format("/api/sessions/%s/messages?since=%d", sid, c.rev))
     if not res then
         if State.online ~= false or State.status ~= err then
             State.online, State.status = false, err
@@ -182,22 +218,35 @@ local function sync()
     end
     local was_online = State.online
     State.online, State.status = true, nil
-    if (res.rev or 0) < State.rev then
+    if (res.rev or 0) < c.rev then
         -- the laptop's history was reset: start over
-        State.messages, State.rev = {}, 0
-        return sync()
+        c.messages, c.rev = {}, 0
+        return sync(sid)
     end
     local news = #(res.messages or {}) > 0
     for _, m in ipairs(res.messages or {}) do
-        State.messages[m.id] = m
+        c.messages[m.id] = m
     end
-    State.rev = res.rev or State.rev
-    if news then saveCache() end
-    if news or was_online ~= true or State.busy ~= res.busy then
-        State.busy = res.busy
-        refreshWindows()
+    c.rev = res.rev or c.rev
+    if res.title and res.title ~= c.title then c.title = res.title; news = true end
+    if news then saveCache(sid) end
+    if news or was_online ~= true or c.busy ~= res.busy then
+        c.busy = res.busy
+        refreshWindows(was_online ~= true and nil or sid)
     end
     return true
+end
+
+local function syncAll()
+    flushOutbox()
+    local done = {}
+    for w in pairs(State.windows) do
+        local sid = w.gemma_sid
+        if sid and not done[sid] then
+            done[sid] = true
+            if not sync(sid) then break end
+        end
+    end
 end
 
 local function poll()
@@ -205,7 +254,7 @@ local function poll()
         State.polling = false
         return
     end
-    sync()
+    syncAll()
     UIManager:scheduleIn(State.online and POLL_FAST or POLL_SLOW, poll)
 end
 
@@ -219,29 +268,30 @@ end
 -- Audio
 ---------------------------------------------------------------------------
 
-local function sortedMessages()
+local function sortedMessages(sid)
     local list = {}
-    for _, m in pairs(State.messages) do table.insert(list, m) end
+    for _, m in pairs(conv(sid).messages) do table.insert(list, m) end
     table.sort(list, function(a, b) return a.id < b.id end)
     return list
 end
 
-local function clipFor(m)
+local function clipFor(sid, m)
     local host, port, pin = server()
     if not host then return end
     return {
-        url = string.format("http://%s:%s/api/audio/%s/%d.wav?pin=%s", host, port, SESSION, m.id, pin or ""),
+        url = string.format("http://%s:%s/api/audio/%s/%d.wav?pin=%s", host, port, sid, m.id, pin or ""),
         title = T(_("Gemma: %1"), (m.text or ""):gsub("%s+", " "):sub(1, 60)),
         source = "gemma",
     }
 end
 
-local function playLastReply()
-    local list = sortedMessages()
+local function playLastReply(sid)
+    sid = sid or State.last_sid or "main"
+    local list = sortedMessages(sid)
     for i = #list, 1, -1 do
         local m = list[i]
         if m.role == "assistant" and m.status == "done" then
-            local clip = clipFor(m)
+            local clip = clipFor(sid, m)
             if clip then require("apps/kos/audiopipeline").play(clip) end
             return
         end
@@ -287,9 +337,9 @@ function Gemma:addToMainMenu(menu_items)
     }
 end
 
-local function conversationText()
+local function conversationText(sid)
     local parts = {}
-    for _, m in ipairs(sortedMessages()) do
+    for _, m in ipairs(sortedMessages(sid)) do
         local who
         if m.role == "assistant" then
             who = "◆ Gemma"
@@ -302,7 +352,9 @@ local function conversationText()
         table.insert(parts, who .. stamp .. "\n" .. text)
     end
     for _, item in ipairs(outbox()) do
-        table.insert(parts, "▸ " .. _("You (phone)") .. " · " .. _("waiting to send") .. "\n" .. item.text)
+        if (item.sid or "main") == sid then
+            table.insert(parts, "▸ " .. _("You (phone)") .. " · " .. _("waiting to send") .. "\n" .. item.text)
+        end
     end
     if #parts == 0 then
         return _("No messages yet. Tap Write to start.")
@@ -310,17 +362,20 @@ local function conversationText()
     return table.concat(parts, "\n\n")
 end
 
-local function statusLine()
+local function statusLine(sid)
     local host = server()
     if not host then return _("Not connected. Tap ⋯ → Connect to laptop.") end
-    local waiting = #outbox()
+    local waiting = 0
+    for _, item in ipairs(outbox()) do
+        if (item.sid or "main") == sid then waiting = waiting + 1 end
+    end
     local line
     if State.online == nil then
         line = _("Connecting…")
     elseif State.online then
         line = T(_("Connected to %1"), (State.info and State.info.name) or host)
         if State.info and State.info.model then line = line .. " · " .. State.info.model end
-        if State.busy then line = line .. " · " .. _("Gemma is writing") end
+        if conv(sid).busy then line = line .. " · " .. _("Gemma is writing") end
     else
         line = T(_("Laptop not reachable (%1). Showing the saved conversation."), State.status or "?")
     end
@@ -329,10 +384,11 @@ local function statusLine()
 end
 
 function Gemma:build(window, width, height)
+    local sid = window.gemma_sid or "main"
     local margin = Size.padding.default
     local inner = width - 2 * margin
     local status = TextWidget:new{
-        text = statusLine(),
+        text = statusLine(sid),
         face = Font:getFace("smallinfofont"),
         fgcolor = Blitbuffer.COLOR_DARK_GRAY,
         max_width = inner,
@@ -341,22 +397,23 @@ function Gemma:build(window, width, height)
         width = inner,
         show_parent = window,
         buttons = {{
-            { text = _("Write"), font_bold = true, callback = function() self:compose() end },
-            { text = "▶", callback = playLastReply },
+            { text = _("Write"), font_bold = true, callback = function() self:compose(window) end },
+            { text = "▶", callback = function() playLastReply(sid) end },
             { text = "⟲", callback = function() require("apps/kos/audiopipeline").repeatLast() end,
               hold_callback = function() require("apps/kos/audiopipeline").showRecent() end },
-            { text = "⋯", callback = function() self:moreMenu() end },
+            { text = _("Chats"), callback = function() self:chooseConversation(window) end },
+            { text = "⋯", callback = function() self:moreMenu(window) end },
         }},
     }
     local text_h = height - 2 * margin - status:getSize().h - buttons:getSize().h - 2 * Size.padding.small
-    local conv = ScrollTextWidget:new{
-        text = conversationText(),
+    local view = ScrollTextWidget:new{
+        text = conversationText(sid),
         face = Font:getFace("cfont", 19),
         width = inner,
         height = math.max(text_h, 50),
         dialog = window,
     }
-    conv:scrollToBottom()
+    view:scrollToBottom()
     return FrameContainer:new{
         padding = margin,
         margin = 0,
@@ -367,29 +424,31 @@ function Gemma:build(window, width, height)
             align = "left",
             status,
             VerticalSpan:new{ width = Size.padding.small },
-            conv,
+            view,
             VerticalSpan:new{ width = Size.padding.small },
             buttons,
         },
     }
 end
 
-function Gemma:compose(prefill)
+function Gemma:compose(window, prefill)
+    local sid = window.gemma_sid or "main"
+    State.last_sid = sid
     local dialog
     dialog = InputDialog:new{
-        title = _("Message Gemma"),
+        title = T(_("Message Gemma · %1"), convTitle(sid)),
         input = prefill or "",
         allow_newline = true,
         input_height = 4,
         -- the row on top of the keyboard (Paste, ⟲) gets ▶ = read Gemma's last reply
-        kos_toolbar_audio = { play = playLastReply },
+        kos_toolbar_audio = { play = function() playLastReply(sid) end },
         buttons = {
             {
                 { text = _("Cancel"), id = "close", callback = function() UIManager:close(dialog) end },
                 { text = _("Send"), is_enter_default = true, callback = function()
                     local text = dialog:getInputText()
                     UIManager:close(dialog)
-                    self:send(text)
+                    self:send(sid, text)
                 end },
             },
         },
@@ -398,32 +457,126 @@ function Gemma:compose(prefill)
     dialog:onShowKeyboard()
 end
 
-function Gemma:send(text)
+function Gemma:send(sid, text)
     text = text and text:gsub("^%s+", ""):gsub("%s+$", "")
     if not text or text == "" then return end
     local box = outbox()
-    table.insert(box, { text = text, client_id = newClientId() })
+    table.insert(box, { sid = sid, text = text, client_id = newClientId() })
     settings():saveSetting("outbox", box)
     settings():flush()
-    refreshWindows()
+    refreshWindows(sid)
     UIManager:nextTick(function()
-        sync()
-        refreshWindows()
+        flushOutbox()
+        sync(sid)
+        refreshWindows(sid)
     end)
 end
 
-function Gemma:moreMenu()
+--- Shows this window another conversation.
+function Gemma:switchTo(window, sid)
+    window.gemma_sid = sid
+    State.last_sid = sid
+    settings():saveSetting("last_sid", sid)
+    window:setTitle(_("Gemma"), convTitle(sid))
+    window:refresh()
+    UIManager:nextTick(function() sync(sid) end)
+end
+
+function Gemma:newConversation(window)
+    local dialog
+    dialog = InputDialog:new{
+        title = _("New conversation"),
+        input = "",
+        input_hint = _("Name (optional)"),
+        kos_toolbar = false,
+        buttons = {{
+            { text = _("Cancel"), id = "close", callback = function() UIManager:close(dialog) end },
+            { text = _("Start"), is_enter_default = true, callback = function()
+                local title = dialog:getInputText()
+                UIManager:close(dialog)
+                if title == "" then title = os.date("%d %b %H:%M") end
+                local res, err = request("POST", "/api/sessions", { title = title })
+                if not res then
+                    UIManager:show(InfoMessage:new{ text = T(_("The laptop is needed to start a conversation: %1"), err or "?") })
+                    return
+                end
+                conv(res.id).title = res.title
+                saveCache(res.id)
+                self:switchTo(window, res.id)
+            end },
+        }},
+    }
+    UIManager:show(dialog)
+    dialog:onShowKeyboard()
+end
+
+--- All conversations (from the laptop, or the copies on the phone when offline).
+function Gemma:chooseConversation(window)
+    local list = request("GET", "/api/sessions")
+    local entries = {}
+    if list then
+        for _, s in ipairs(list) do
+            conv(s.id).title = s.title
+            table.insert(entries, { id = s.id, title = s.title, count = s.count })
+        end
+    else
+        for sid, c in pairs(State.convs) do
+            table.insert(entries, { id = sid, title = c.title or sid })
+        end
+        table.sort(entries, function(a, b) return tostring(a.title) < tostring(b.title) end)
+    end
+    local Menu = require("ui/widget/menu")
+    local items = {{ text = "+ " .. _("New conversation"), new = true }}
+    for _, e in ipairs(entries) do
+        local open_here = e.id == window.gemma_sid
+        table.insert(items, {
+            text = (open_here and "● " or "") .. tostring(e.title),
+            mandatory = e.count and T(_("%1 msgs"), e.count) or nil,
+            sid = e.id,
+        })
+    end
+    local menu
+    menu = Menu:new{
+        title = list and _("Conversations") or _("Conversations (saved on the phone)"),
+        item_table = items,
+        covers_fullscreen = true,
+        is_borderless = true,
+        is_popout = false,
+        onMenuSelect = function(_, item)
+            UIManager:close(menu)
+            if item.new then
+                self:newConversation(window)
+            else
+                self:switchTo(window, item.sid)
+            end
+        end,
+        onMenuHold = function(_, item)
+            if not item.sid then return true end
+            UIManager:close(menu)
+            -- open that conversation in another window, beside this one
+            self.next_sid = item.sid
+            require("apps/kos/windows").newInstance(window)
+            return true
+        end,
+        close_callback = function() UIManager:close(menu) end,
+    }
+    UIManager:show(menu)
+end
+
+function Gemma:moreMenu(window)
     local dlg
+    local function act(fn) return function() UIManager:close(dlg); fn() end end
     dlg = ButtonDialog:new{
         buttons = {
-            {{ text = _("Connect to laptop…"), callback = function() UIManager:close(dlg); self:setup() end }},
-            {{ text = _("Recently played audio"), callback = function()
-                UIManager:close(dlg); require("apps/kos/audiopipeline").showRecent() end }},
-            {{ text = _("Clear the copy on this phone"), callback = function()
-                UIManager:close(dlg)
-                State.messages, State.rev = {}, 0
-                saveCache(); refreshWindows(); UIManager:nextTick(sync)
-            end }},
+            {{ text = _("New conversation…"), callback = act(function() self:newConversation(window) end) }},
+            {{ text = _("New Gemma window"), callback = act(function() require("apps/kos/windows").newInstance(window) end) }},
+            {{ text = _("Connect to laptop…"), callback = act(function() self:setup() end) }},
+            {{ text = _("Recently played audio"), callback = act(function() require("apps/kos/audiopipeline").showRecent() end) }},
+            {{ text = _("Clear the copy on this phone"), callback = act(function()
+                local sid = window.gemma_sid or "main"
+                State.convs[sid] = { messages = {}, rev = 0, title = convTitle(sid) }
+                saveCache(sid); refreshWindows(sid); UIManager:nextTick(function() sync(sid) end)
+            end) }},
         },
     }
     UIManager:show(dlg)
@@ -440,7 +593,7 @@ function Gemma:setup()
         if info then
             State.info, State.online = info, true
             UIManager:show(InfoMessage:new{ text = T(_("Connected to %1."), info.name or h), timeout = 3 })
-            sync()
+            syncAll()
         else
             State.online, State.status = false, err
             UIManager:show(InfoMessage:new{ text = T(_("Could not reach the laptop: %1"), err or "?") })
@@ -492,14 +645,26 @@ end
 
 function Gemma:launchApp()
     settings()
+    -- The first window opens the last conversation; "Chats" (hold) or the
+    -- menu can open another one in a second window.
+    local sid = self.next_sid or settings():readSetting("last_sid") or "main"
+    self.next_sid = nil
     local window
     window = AppWindow:open{
         title = _("Gemma"),
+        subtitle = convTitle(sid),
         max_content_dp = 720,
-        build = function(w, width, height) return self:build(w, width, height) end,
+        build = function(w, width, height)
+            w.gemma_sid = w.gemma_sid or (window and window.gemma_sid) or sid
+            return self:build(w, width, height)
+        end,
         on_close = function() State.windows[window] = nil end,
     }
-    if window then State.windows[window] = true end
+    if window then
+        window.gemma_sid = sid
+        State.windows[window] = true
+        window:refresh()
+    end
     local NetworkMgr = require("ui/network/manager")
     NetworkMgr:runWhenConnected(function()
         if not server() then

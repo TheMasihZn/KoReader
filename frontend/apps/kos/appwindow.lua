@@ -86,6 +86,7 @@ function AppWindow:open(params)
         return Workspace:getInstance():addPane(params, target)
     end
     local window = self:new(params)
+    require("apps/kos/windows").add(window)
     UIManager:show(window)
     return window
 end
@@ -108,9 +109,11 @@ function AppWindow:_layout()
         width = width,
         fullscreen = true,
         with_bottom_line = true,
-        title = self.title,
+        title = require("apps/kos/windows").displayTitle(self),
         subtitle = self.subtitle,
         left_icon = self.home_button and "home" or nil,
+        -- long-press Home: this window's menu (split view, new window, all windows)
+        left_icon_hold_callback = function() require("apps/kos/windows").windowMenu(self) end,
         left_icon_tap_callback = self.home_button and function() self:goHome() end or nil,
         close_callback = function() self:close() end,
         show_parent = self,
@@ -150,7 +153,7 @@ end
 
 function AppWindow:setTitle(title, subtitle)
     self.title = title
-    self.title_bar:setTitle(title, true)
+    self.title_bar:setTitle(require("apps/kos/windows").displayTitle(self), true)
     if subtitle ~= nil then
         self.subtitle = subtitle
         self.title_bar:setSubTitle(subtitle, true)
@@ -169,10 +172,16 @@ function AppWindow:close(force)
         return
     end
     UIManager:close(self)
+    require("apps/kos/windows").remove(self)
     if self.on_close then
         self.on_close(self)
         self.on_close = nil
     end
+end
+
+-- However the window goes away (also UIManager:close), it leaves the window list.
+function AppWindow:onCloseWidget()
+    require("apps/kos/windows").remove(self)
 end
 
 function AppWindow:onClose()
