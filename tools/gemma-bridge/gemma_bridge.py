@@ -40,6 +40,8 @@ APP_DIR = os.path.expanduser("~/.gemma-bridge")
 SESSIONS_DIR = os.path.join(APP_DIR, "sessions")
 CONFIG_FILE = os.path.join(APP_DIR, "config.json")
 AUDIO_DIR = os.path.join(APP_DIR, "audio")
+import fileshare  # noqa: E402  (same folder)
+
 DISCOVERY_PORT = 47801
 DISCOVERY_ASK = b"GEMMA-BRIDGE?"
 
@@ -311,6 +313,7 @@ class Speech:
 # --------------------------------------------------------------------------
 
 def make_handler(store, gen, ollama, cfg, speech):
+    share_root = fileshare.share_root(cfg)
     class Handler(BaseHTTPRequestHandler):
         server_version = "GemmaBridge/1"
 
@@ -382,6 +385,27 @@ def make_handler(store, gen, ollama, cfg, speech):
                 self.end_headers()
                 self.wfile.write(body)
                 return
+            if u.path == "/api/files":
+                items = fileshare.listing(share_root, (q.get("path") or [""])[0])
+                if items is None:
+                    return self._json(404, {"error": "no such folder"})
+                return self._json(200, {"path": (q.get("path") or [""])[0], "items": items})
+            if u.path == "/api/files/get":
+                full = fileshare.safe_path(share_root, (q.get("path") or [""])[0])
+                if full is None or not os.path.isfile(full):
+                    return self._json(404, {"error": "no such file"})
+                size = os.path.getsize(full)
+                self.send_response(200)
+                self.send_header("Content-Type", "application/octet-stream")
+                self.send_header("Content-Length", str(size))
+                self.end_headers()
+                with open(full, "rb") as f:
+                    while True:
+                        chunk = f.read(65536)
+                        if not chunk:
+                            break
+                        self.wfile.write(chunk)
+                return
             if u.path == "/api/sessions":
                 return self._json(200, store.summary())
             parts = u.path.strip("/").split("/")
@@ -390,6 +414,17 @@ def make_handler(store, gen, ollama, cfg, speech):
                 wait = float((q.get("wait") or ["0"])[0])
                 res = store.changes(parts[2], since, wait)
                 return self._json(200, res) if res else self._json(404, {"error": "no such session"})
+            self._json(404, {"error": "not found"})
+
+        def do_PUT(self):
+            u = urlparse(self.path)
+            q = parse_qs(u.query)
+            if not self._authorized():
+                return self._json(401, {"error": "wrong or missing PIN"})
+            if u.path == "/api/files/put":
+                n = int(self.headers.get("Content-Length") or -1)
+                ok, msg = fileshare.save_upload(share_root, (q.get("path") or [""])[0], self.rfile, n)
+                return self._json(200 if ok else 400, {"ok": ok, "message": msg})
             self._json(404, {"error": "not found"})
 
         def do_POST(self):
@@ -513,6 +548,7 @@ def main():
     print(f"  Speech:  {speech.engine or 'none (for read-aloud: sudo apt install espeak-ng)'}")
     print(f"  Laptop:  http://localhost:{args.port}")
     print(f"  Phone:   open the Gemma app in KOReader. Address {ip}:{args.port}, PIN {cfg['pin']}")
+    print(f"  Shared folder: {fileshare.share_root(cfg)}  (files you send from the phone land here)")
     print("  Stop with Ctrl+C. Conversations are kept in ~/.gemma-bridge/")
     try:
         server.serve_forever()

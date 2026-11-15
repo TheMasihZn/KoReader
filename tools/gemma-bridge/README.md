@@ -40,3 +40,11 @@ Home → **Gemma** → ⋯ → **Connect to laptop** → **Find on Wi-Fi** (or t
 
 - `apps/kos/audiopipeline` handles play, repeat and history for any app: `Audio.play{ url = …, title = … }`.
 - `apps/kos/keyboardtoolbar` builds the Paste + audio row that sits on top of the keyboard. The future KOReader OS keyboard will show the same row.
+
+## Shared folder (Share app)
+
+The bridge also serves a shared folder, `~/KOS-Share` (change it with `"share_dir"` in
+`~/.gemma-bridge/config.json`). On the phone open **Share** on Home: browse the folder, tap a
+file to download it into `<home>/KOS-Share/`, or send a file from the phone. Long-press any
+file in the file manager → **Send to laptop**. Paths that try to leave the folder are refused.
+Keep `fileshare.py` next to `gemma_bridge.py`.
