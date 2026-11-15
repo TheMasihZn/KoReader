@@ -105,6 +105,7 @@ local AppLauncher = WidgetContainer:extend{
 local started_once = false
 
 function AppLauncher:init()
+    require("apps/kos/flatstyle").install()
     self:onDispatcherRegisterActions()
     self.ui.menu:registerToMainMenu(self)
     -- "Open with…" in the long-press menu of files that apps can open.
@@ -141,6 +142,15 @@ function AppLauncher:addToMainMenu(menu_items)
                 text = _("Open at startup"),
                 checked_func = function() return G_reader_settings:isTrue("applauncher_at_startup") end,
                 callback = function() G_reader_settings:flipNilOrFalse("applauncher_at_startup") end,
+            },
+            {
+                text = _("Flat design"),
+                help_text = _("Softer outlines and tonal depth: the window in front is lightest, the ones behind it are darker. Restart to apply to dialogs. Turn off on black-and-white e-ink screens."),
+                checked_func = function() return G_reader_settings:nilOrTrue("kos_flat_design") end,
+                callback = function()
+                    G_reader_settings:flipNilOrTrue("kos_flat_design")
+                    require("ui/uimanager"):askForRestart(_("Restart KOReader to apply the design change."))
+                end,
             },
             {
                 text = _("Paste and audio row on the keyboard"),

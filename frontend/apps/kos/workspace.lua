@@ -125,7 +125,16 @@ end
 function Pane:paintTo(bb, x, y)
     self.dimen.x, self.dimen.y = x, y
     local focused = self.workspace and self.workspace.focused == self
-    self[1].color = focused and Blitbuffer.COLOR_BLACK or Blitbuffer.COLOR_LIGHT_GRAY
+    local Flat = require("apps/kos/flatstyle")
+    if Flat.enabled() then
+        -- Flat, tonal depth: the window in front is lightest, the others sit
+        -- darker and further back; outlines stay soft instead of black.
+        local solo = self.workspace and #self.workspace:getPanes() == 1
+        self[1].background = (focused or solo) and Flat.surface or Flat.surface_back
+        self[1].color = (focused or solo) and Flat.line_front or Flat.line_back
+    else
+        self[1].color = focused and Blitbuffer.COLOR_BLACK or Blitbuffer.COLOR_LIGHT_GRAY
+    end
     self[1]:paintTo(bb, x, y)
 end
 
