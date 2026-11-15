@@ -170,6 +170,12 @@ end
 function AppInstaller.offer(zip_file, open_normally)
     local found = AppInstaller.inspect(zip_file)
     if not found then
+        -- Not an add-on: maybe an update with replacement files for built-in apps.
+        local updates = require("pluginloader"):getPluginInstance("updates")
+        if updates and updates.offerZip then
+            local ok, shown = pcall(updates.offerZip, zip_file, open_normally)
+            return ok and shown or false
+        end
         return false
     end
     local lines, names = {}, {}

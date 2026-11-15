@@ -21,6 +21,9 @@ io.write([[
 -- Set up Lua and ffi search paths
 require("setupkoenv")
 
+-- KOReader OS: replacement files for built-in apps (see apps/kos/overrides.lua)
+pcall(function() require("apps/kos/overrides").install() end)
+
 -- Apply startup user patches and execute startup user scripts
 local userpatch = require("userpatch")
 userpatch.applyPatches(userpatch.early_once)

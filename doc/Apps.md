@@ -115,6 +115,17 @@ Every app that opens an `AppWindow` can also run in a window next to other apps.
 - **Resize:** drag the divider between two windows. Tap it to cycle 1/3 · 1/2 · 2/3, or long-press it for equal sizes, swap or stack.
 - **Any number of windows:** windows sit in a layout tree (`frontend/apps/kos/workspace.lua`), so splits can nest: side by side inside stacked, and so on. `Workspace:addPane(params, { next_to = pane, dir = "row" | "column" })` is the API.
 
+## Updates: replacing built-in apps
+
+The **Updates** app (Home) installs updates for KOReader's own apps, not add-ons. An update is a `.zip` with files laid out like the source, for example `frontend/apps/kos/appwindow.lua`. Install it from Updates → Install update, or tap the zip in Files.
+
+- Files go to `koreader/overrides/files/` and are used instead of the built-in ones after a restart. The built-in files are never changed.
+- Tap an entry to switch it on or off. Hold it to edit, go back to the previous version, or delete it.
+- **Edit a built-in file** makes your own copy of any app file to edit in the Text editor.
+- If KOReader doesn't start twice in a row while replacements are on, they all switch themselves off. Updates tells you, and you switch them on one at a time.
+- A replacement with a syntax error is ignored.
+- Only app files (modules under `apps/`) can be replaced. Plugins are add-ons: use the App installer.
+
 ## Several windows of one app
 
 Every app that opens an `AppWindow` can run in several windows at once. Its
