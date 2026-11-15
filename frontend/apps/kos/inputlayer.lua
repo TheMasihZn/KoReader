@@ -108,4 +108,77 @@ function IL.type(text, who)
     return ok
 end
 
+---------------------------------------------------------------------------
+-- Buttons: press any key by name, and hear every key and gesture.
+---------------------------------------------------------------------------
+
+--- Names usable with IL.key: the Android hardware keys plus letters, arrows, etc.
+function IL.keyNames()
+    local names, seen = {}, {}
+    local ok, map = pcall(require, "device/android/event_map")
+    if ok and type(map) == "table" then
+        for _k, v in pairs(map) do
+            if type(v) == "string" and not seen[v] then seen[v] = true names[#names + 1] = v end
+        end
+    end
+    for _i, v in ipairs({ "Back", "Home", "Menu", "Press", "Up", "Down", "Left", "Right", "LPgBack", "LPgFwd",
+                          "RPgBack", "RPgFwd", "Enter", "Backspace", "Del", "Tab", "Space", "Escape" }) do
+        if not seen[v] then seen[v] = true names[#names + 1] = v end
+    end
+    table.sort(names)
+    return names
+end
+
+--- Presses and releases a key inside KOReader, like a hardware button would.
+-- `modifiers` is optional: { Shift = true, Ctrl = true }.
+-- (Android's own system buttons, such as the volume rocker, cannot be pressed by an app.)
+function IL.key(name, who, modifiers)
+    if not IL.enabled then trace(who, "key", tostring(name), "blocked") return false end
+    local ok, err = pcall(function()
+        local Key = require("device/key")
+        local key = Key:new(name, modifiers or {})
+        key.__kos_synthetic = true
+        UIManager:sendEvent(Event:new("KeyPress", key))
+        UIManager:sendEvent(Event:new("KeyRelease", key))
+    end)
+    trace(who, "key", tostring(name), ok and "ok" or tostring(err))
+    return ok
+end
+
+local listeners, installed = {}, false
+
+local function emit(info)
+    for fn in pairs(listeners) do
+        local ok, err = pcall(fn, info)
+        if not ok then listeners[fn] = nil end -- a broken listener is dropped, not retried
+    end
+end
+
+local function install()
+    if installed then return end
+    installed = true
+    local orig = UIManager.sendEvent
+    UIManager.sendEvent = function(self, event, ...)
+        local h = event and event.handler
+        if h == "onGesture" and event.args and event.args[1] then
+            local g = event.args[1]
+            emit{ kind = "gesture", name = g.ges, x = g.pos and g.pos.x, y = g.pos and g.pos.y, direction = g.direction }
+        elseif h == "onKeyPress" or h == "onKeyRelease" then
+            local k = event.args and event.args[1]
+            emit{ kind = "key", name = k and k.key, down = h == "onKeyPress", synthetic = k and k.__kos_synthetic or false }
+        end
+        return orig(self, event, ...)
+    end
+end
+
+--- Calls fn(info) for every key and gesture KOReader receives, real or synthetic.
+-- info = { kind = "key", name = "LPgBack", down = true/false, synthetic = bool }
+--      | { kind = "gesture", name = "tap"/"swipe"/..., x, y, direction }
+-- Returns a function that stops listening. fn errors drop the listener.
+function IL.listen(fn)
+    install()
+    listeners[fn] = true
+    return function() listeners[fn] = nil end
+end
+
 return IL

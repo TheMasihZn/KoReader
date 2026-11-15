@@ -1027,6 +1027,17 @@ Device.input.handleMiscEv = function(this, ev)
     return orig_handleMiscEv(this, ev)
 end
 
+-- Volume keys belong to Android (volume), not to page turning. On by default; the stock
+-- setting "android_ignore_volume_keys" still switches it back (Settings > Navigation).
+pcall(function()
+    if G_reader_settings:readSetting("android_ignore_volume_keys") == nil then
+        G_reader_settings:saveSetting("android_ignore_volume_keys", true)
+    end
+    local ignore = G_reader_settings:isTrue("android_ignore_volume_keys")
+    android.setVolumeKeysIgnored(ignore)
+    plog("volume keys", ignore and "go to Android" or "turn pages")
+end)
+
 -- In case we were started directly in a split-screen window.
 UIManager:scheduleIn(0.5, function() scheduleCheck("start") end)
 plog("all sections loaded")
