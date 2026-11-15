@@ -122,6 +122,7 @@ local util = require("util")
 local _ = require("gettext")
 
 local InputDialog = FocusManager:extend{
+    kos_toolbar_builtin = true, -- the KOReader OS row on the keyboard is built in (see kos_toolbar below)
     is_always_active = true,
     title = "",
     input = "",

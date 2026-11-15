@@ -324,6 +324,8 @@ end
 
 --- Called from reader.lua right after setupkoenv: puts the replacements in front of the built-in files.
 function Overrides.install()
+    if Overrides.installed then return end
+    Overrides.installed = true
     local ok, err = pcall(function()
         local dir = baseDir()
         if lfs.attributes(Overrides.filesDir(), "mode") ~= "directory" then return end
@@ -383,6 +385,43 @@ function Overrides.install()
     end)
     if not ok then
         io.stderr:write("[overrides] could not start: ", tostring(err), "\n")
+    end
+end
+
+--- Replacement add-ons: `koreader/overrides/plugins/<name>.koplugin` is used instead of the
+-- built-in plugin of that name, or added if there is none. (A plugin's main.lua isn't a
+-- `require`d module, so the plugin loader is told to look here instead.)
+-- Needs to run before plugins load; the boot patch calls it.
+function Overrides.hookPlugins()
+    if Overrides.plugins_hooked then return end
+    Overrides.plugins_hooked = true
+    local pdir = baseDir() .. "/plugins"
+    if Overrides.safe_off or lfs.attributes(pdir, "mode") ~= "directory" then return end
+    local PluginLoader = require("pluginloader")
+    local orig = PluginLoader._discover
+    PluginLoader._discover = function(self, ...)
+        local list = orig(self, ...)
+        local disabled_set = G_reader_settings and G_reader_settings:readSetting("plugins_disabled") or {}
+        for entry in lfs.dir(pdir) do
+            local root = pdir .. "/" .. entry
+            if entry:match("%.koplugin$") and lfs.attributes(root .. "/main.lua", "mode") == "file" then
+                local name = entry:sub(1, -10)
+                local found
+                for _, p in ipairs(list) do
+                    if p.name == name then found = p break end
+                end
+                if not found then
+                    found = { name = name }
+                    table.insert(list, found)
+                    found.disabled = disabled_set[name] and true or false
+                end
+                found.path = root
+                found.meta = root .. "/_meta.lua"
+                found.main = found.disabled and found.meta or (root .. "/main.lua")
+                Overrides.plugin_replacements = (Overrides.plugin_replacements or 0) + 1
+            end
+        end
+        return list
     end
 end
 
