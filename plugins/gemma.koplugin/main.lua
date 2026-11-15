@@ -1,0 +1,505 @@
+--[[--
+Gemma: the phone side of the Gemma bridge (tools/gemma-bridge/gemma_bridge.py
+runs on the laptop, in front of Ollama).
+
+* Same conversation as the laptop: both read and write the bridge's "main" session.
+* Nothing gets lost: a message is kept in an outbox (on disk) until the laptop
+  confirms it; resending is safe because each message carries its own id.
+* The conversation is cached on the phone, so it can be read offline.
+* Audio: ▶ reads the last reply aloud (the laptop makes and caches the .wav),
+  ⟲ repeats, hold ⟲ lists recent clips. Through Bluetooth when connected.
+]]
+
+local AppWindow = require("apps/kos/appwindow")
+local ButtonDialog = require("ui/widget/buttondialog")
+local ButtonTable = require("ui/widget/buttontable")
+local DataStorage = require("datastorage")
+local Font = require("ui/font")
+local FrameContainer = require("ui/widget/container/framecontainer")
+local InfoMessage = require("ui/widget/infomessage")
+local InputDialog = require("ui/widget/inputdialog")
+local LuaSettings = require("luasettings")
+local MultiInputDialog = require("ui/widget/multiinputdialog")
+local ScrollTextWidget = require("ui/widget/scrolltextwidget")
+local Size = require("ui/size")
+local TextWidget = require("ui/widget/textwidget")
+local UIManager = require("ui/uimanager")
+local VerticalGroup = require("ui/widget/verticalgroup")
+local VerticalSpan = require("ui/widget/verticalspan")
+local WidgetContainer = require("ui/widget/container/widgetcontainer")
+local Blitbuffer = require("ffi/blitbuffer")
+local _ = require("gettext")
+local T = require("ffi/util").template
+
+local DISCOVERY_PORT = 47801
+local SESSION = "main"
+local POLL_FAST = 1.5   -- seconds, while connected
+local POLL_SLOW = 10    -- seconds, while the laptop can't be reached
+
+-- One state shared by every Gemma window (several windows = same conversation).
+local State = {
+    windows = {},
+    messages = {},  -- id -> message
+    rev = 0,
+    online = nil,   -- nil = not tried yet, true/false
+    status = nil,
+    busy = false,
+    info = nil,
+    polling = false,
+}
+
+local store
+local function settings()
+    if not store then
+        store = LuaSettings:open(DataStorage:getSettingsDir() .. "/kos_gemma.lua")
+        -- the phone's cache of the conversation, for offline reading
+        for _, m in ipairs(store:readSetting("cache") or {}) do
+            State.messages[m.id] = m
+        end
+        State.rev = store:readSetting("cache_rev") or 0
+    end
+    return store
+end
+
+local function saveCache()
+    local list = {}
+    for _, m in pairs(State.messages) do table.insert(list, m) end
+    table.sort(list, function(a, b) return a.id < b.id end)
+    while #list > 300 do table.remove(list, 1) end
+    settings():saveSetting("cache", list)
+    settings():saveSetting("cache_rev", State.rev)
+    settings():flush()
+end
+
+local function server()
+    local s = settings()
+    return s:readSetting("host"), s:readSetting("port") or 8765, s:readSetting("pin")
+end
+
+local function newClientId()
+    return string.format("phone-%d-%06d", os.time(), math.random(0, 999999))
+end
+
+---------------------------------------------------------------------------
+-- Network
+---------------------------------------------------------------------------
+
+local function request(method, path, body)
+    local host, port, pin = server()
+    if not host then return nil, "no laptop set" end
+    local http = require("socket.http")
+    local ltn12 = require("ltn12")
+    local socket = require("socket")
+    local socketutil = require("socketutil")
+    local JSON = require("json")
+    local sink = {}
+    local payload = body and JSON.encode(body) or nil
+    socketutil:set_timeout(2, 5) -- short: the UI waits for this
+    local code = socket.skip(1, http.request{
+        url = string.format("http://%s:%s%s", host, port, path),
+        method = method,
+        headers = {
+            ["X-Bridge-Pin"] = pin or "",
+            ["Content-Type"] = payload and "application/json" or nil,
+            ["Content-Length"] = payload and tostring(#payload) or nil,
+        },
+        source = payload and ltn12.source.string(payload) or nil,
+        sink = ltn12.sink.table(sink),
+    })
+    socketutil:reset_timeout()
+    if code ~= 200 then
+        local err = tostring(code)
+        if code == 401 then err = _("wrong PIN") end
+        return nil, err
+    end
+    local ok, data = pcall(JSON.decode, table.concat(sink))
+    if not ok then return nil, "bad reply" end
+    return data
+end
+
+--- Finds the laptop on the Wi-Fi (the bridge answers a broadcast).
+local function discover()
+    local socket = require("socket")
+    local udp = socket.udp4 and socket.udp4() or socket.udp()
+    if not udp then return end
+    udp:setoption("broadcast", true)
+    udp:settimeout(2)
+    udp:sendto("GEMMA-BRIDGE?", "255.255.255.255", DISCOVERY_PORT)
+    local data, host = udp:receivefrom()
+    udp:close()
+    if data and host then
+        local ok, info = pcall(require("json").decode, data)
+        if ok and type(info) == "table" then
+            return host, info.port, info.name
+        end
+    end
+end
+
+---------------------------------------------------------------------------
+-- Sync
+---------------------------------------------------------------------------
+
+local function refreshWindows()
+    for w in pairs(State.windows) do w:refresh() end
+end
+
+local function outbox()
+    return settings():readSetting("outbox") or {}
+end
+
+--- Sends what is waiting in the outbox. Each item keeps its client_id, so a
+-- resend after a lost answer never doubles a message on the laptop.
+local function flushOutbox()
+    local box = outbox()
+    local changed = false
+    while box[1] do
+        local item = box[1]
+        local res, err = request("POST", "/api/sessions/" .. SESSION .. "/messages",
+            { text = item.text, from = "phone", client_id = item.client_id })
+        if not res then
+            State.online, State.status = false, err
+            break
+        end
+        table.remove(box, 1)
+        changed = true
+        if res.message then State.messages[res.message.id] = res.message end
+    end
+    if changed then
+        settings():saveSetting("outbox", box)
+        settings():flush()
+    end
+end
+
+local function sync()
+    flushOutbox()
+    local res, err = request("GET", string.format("/api/sessions/%s/messages?since=%d", SESSION, State.rev))
+    if not res then
+        if State.online ~= false or State.status ~= err then
+            State.online, State.status = false, err
+            refreshWindows()
+        end
+        return false
+    end
+    local was_online = State.online
+    State.online, State.status = true, nil
+    if (res.rev or 0) < State.rev then
+        -- the laptop's history was reset: start over
+        State.messages, State.rev = {}, 0
+        return sync()
+    end
+    local news = #(res.messages or {}) > 0
+    for _, m in ipairs(res.messages or {}) do
+        State.messages[m.id] = m
+    end
+    State.rev = res.rev or State.rev
+    if news then saveCache() end
+    if news or was_online ~= true or State.busy ~= res.busy then
+        State.busy = res.busy
+        refreshWindows()
+    end
+    return true
+end
+
+local function poll()
+    if not next(State.windows) then
+        State.polling = false
+        return
+    end
+    sync()
+    UIManager:scheduleIn(State.online and POLL_FAST or POLL_SLOW, poll)
+end
+
+local function startPolling()
+    if State.polling then return end
+    State.polling = true
+    UIManager:nextTick(poll)
+end
+
+---------------------------------------------------------------------------
+-- Audio
+---------------------------------------------------------------------------
+
+local function sortedMessages()
+    local list = {}
+    for _, m in pairs(State.messages) do table.insert(list, m) end
+    table.sort(list, function(a, b) return a.id < b.id end)
+    return list
+end
+
+local function clipFor(m)
+    local host, port, pin = server()
+    if not host then return end
+    return {
+        url = string.format("http://%s:%s/api/audio/%s/%d.wav?pin=%s", host, port, SESSION, m.id, pin or ""),
+        title = T(_("Gemma: %1"), (m.text or ""):gsub("%s+", " "):sub(1, 60)),
+        source = "gemma",
+    }
+end
+
+local function playLastReply()
+    local list = sortedMessages()
+    for i = #list, 1, -1 do
+        local m = list[i]
+        if m.role == "assistant" and m.status == "done" then
+            local clip = clipFor(m)
+            if clip then require("apps/kos/audiopipeline").play(clip) end
+            return
+        end
+    end
+    UIManager:show(InfoMessage:new{ text = _("No finished reply yet."), timeout = 2 })
+end
+
+---------------------------------------------------------------------------
+-- The app
+---------------------------------------------------------------------------
+
+local Gemma = WidgetContainer:extend{
+    name = "gemma",
+}
+
+function Gemma:init()
+    if self.ui and self.ui.menu then
+        self.ui.menu:registerToMainMenu(self)
+    end
+end
+
+function Gemma:addToMainMenu(menu_items)
+    menu_items.gemma = {
+        text = _("Gemma"),
+        sorting_hint = "tools",
+        sub_item_table = {
+            { text = _("Open"), callback = function() self:launchApp() end },
+            { text = _("Connect to laptop…"), keep_menu_open = true, callback = function() self:setup() end },
+        },
+    }
+end
+
+local function conversationText()
+    local parts = {}
+    for _, m in ipairs(sortedMessages()) do
+        local who
+        if m.role == "assistant" then
+            who = "◆ Gemma"
+        else
+            who = "▸ " .. (m.from == "phone" and _("You (phone)") or m.from == "laptop" and _("You (laptop)") or _("You"))
+        end
+        local stamp = m.time and os.date(" · %H:%M", math.floor(m.time)) or ""
+        local text = m.text or ""
+        if m.status == "thinking" then text = (text ~= "" and text .. " …" or _("thinking…")) end
+        table.insert(parts, who .. stamp .. "\n" .. text)
+    end
+    for _, item in ipairs(outbox()) do
+        table.insert(parts, "▸ " .. _("You (phone)") .. " · " .. _("waiting to send") .. "\n" .. item.text)
+    end
+    if #parts == 0 then
+        return _("No messages yet. Tap Write to start.")
+    end
+    return table.concat(parts, "\n\n")
+end
+
+local function statusLine()
+    local host = server()
+    if not host then return _("Not connected. Tap ⋯ → Connect to laptop.") end
+    local waiting = #outbox()
+    local line
+    if State.online == nil then
+        line = _("Connecting…")
+    elseif State.online then
+        line = T(_("Connected to %1"), (State.info and State.info.name) or host)
+        if State.info and State.info.model then line = line .. " · " .. State.info.model end
+        if State.busy then line = line .. " · " .. _("Gemma is writing") end
+    else
+        line = T(_("Laptop not reachable (%1). Showing the saved conversation."), State.status or "?")
+    end
+    if waiting > 0 then line = line .. " · " .. T(_("%1 waiting to send"), waiting) end
+    return line
+end
+
+function Gemma:build(window, width, height)
+    local margin = Size.padding.default
+    local inner = width - 2 * margin
+    local status = TextWidget:new{
+        text = statusLine(),
+        face = Font:getFace("smallinfofont"),
+        fgcolor = Blitbuffer.COLOR_DARK_GRAY,
+        max_width = inner,
+    }
+    local buttons = ButtonTable:new{
+        width = inner,
+        show_parent = window,
+        buttons = {{
+            { text = _("Write"), font_bold = true, callback = function() self:compose() end },
+            { text = "▶", callback = playLastReply },
+            { text = "⟲", callback = function() require("apps/kos/audiopipeline").repeatLast() end,
+              hold_callback = function() require("apps/kos/audiopipeline").showRecent() end },
+            { text = "⋯", callback = function() self:moreMenu() end },
+        }},
+    }
+    local text_h = height - 2 * margin - status:getSize().h - buttons:getSize().h - 2 * Size.padding.small
+    local conv = ScrollTextWidget:new{
+        text = conversationText(),
+        face = Font:getFace("cfont", 19),
+        width = inner,
+        height = math.max(text_h, 50),
+        dialog = window,
+    }
+    conv:scrollToBottom()
+    return FrameContainer:new{
+        padding = margin,
+        margin = 0,
+        bordersize = 0,
+        width = width,
+        height = height,
+        VerticalGroup:new{
+            align = "left",
+            status,
+            VerticalSpan:new{ width = Size.padding.small },
+            conv,
+            VerticalSpan:new{ width = Size.padding.small },
+            buttons,
+        },
+    }
+end
+
+function Gemma:compose(prefill)
+    local KeyboardToolbar = require("apps/kos/keyboardtoolbar")
+    local ctx = { audio = { play = playLastReply } }
+    local dialog
+    dialog = InputDialog:new{
+        title = _("Message Gemma"),
+        input = prefill or "",
+        allow_newline = true,
+        input_height = 4,
+        buttons = {
+            -- the row on top of the keyboard: Paste, audio, …
+            KeyboardToolbar.row(ctx),
+            {
+                { text = _("Cancel"), id = "close", callback = function() UIManager:close(dialog) end },
+                { text = _("Send"), is_enter_default = true, callback = function()
+                    local text = dialog:getInputText()
+                    UIManager:close(dialog)
+                    self:send(text)
+                end },
+            },
+        },
+    }
+    ctx.input = dialog -- Paste goes here
+    UIManager:show(dialog)
+    dialog:onShowKeyboard()
+end
+
+function Gemma:send(text)
+    text = text and text:gsub("^%s+", ""):gsub("%s+$", "")
+    if not text or text == "" then return end
+    local box = outbox()
+    table.insert(box, { text = text, client_id = newClientId() })
+    settings():saveSetting("outbox", box)
+    settings():flush()
+    refreshWindows()
+    UIManager:nextTick(function()
+        sync()
+        refreshWindows()
+    end)
+end
+
+function Gemma:moreMenu()
+    local dlg
+    dlg = ButtonDialog:new{
+        buttons = {
+            {{ text = _("Connect to laptop…"), callback = function() UIManager:close(dlg); self:setup() end }},
+            {{ text = _("Recently played audio"), callback = function()
+                UIManager:close(dlg); require("apps/kos/audiopipeline").showRecent() end }},
+            {{ text = _("Clear the copy on this phone"), callback = function()
+                UIManager:close(dlg)
+                State.messages, State.rev = {}, 0
+                saveCache(); refreshWindows(); UIManager:nextTick(sync)
+            end }},
+        },
+    }
+    UIManager:show(dlg)
+end
+
+function Gemma:setup()
+    local host, port, pin = server()
+    local function save(h, p, code)
+        local s = settings()
+        s:saveSetting("host", h); s:saveSetting("port", tonumber(p) or 8765); s:saveSetting("pin", code)
+        s:flush()
+        State.online, State.info = nil, nil
+        local info, err = request("GET", "/api/info")
+        if info then
+            State.info, State.online = info, true
+            UIManager:show(InfoMessage:new{ text = T(_("Connected to %1."), info.name or h), timeout = 3 })
+            sync()
+        else
+            State.online, State.status = false, err
+            UIManager:show(InfoMessage:new{ text = T(_("Could not reach the laptop: %1"), err or "?") })
+        end
+        refreshWindows()
+    end
+    local dialog
+    dialog = MultiInputDialog:new{
+        title = _("Connect to laptop"),
+        description = _("On the laptop run: python3 gemma_bridge.py\nIt prints the address and the PIN."),
+        fields = {
+            { description = _("Address"), text = host or "", hint = "192.168.1.20" },
+            { description = _("Port"), text = tostring(port or 8765), input_type = "number" },
+            { description = _("PIN"), text = pin or "", input_type = "number" },
+        },
+        buttons = {
+            {
+                { text = _("Find on Wi-Fi"), callback = function()
+                    local h, p, name = discover()
+                    if h then
+                        local fields = dialog:getFields()
+                        UIManager:close(dialog)
+                        UIManager:show(InfoMessage:new{ text = T(_("Found %1 at %2."), name or "?", h), timeout = 2 })
+                        -- keep the PIN typed so far
+                        UIManager:nextTick(function()
+                            local s = settings()
+                            s:saveSetting("host", h); s:saveSetting("port", tonumber(p) or 8765)
+                            if fields[3] ~= "" then s:saveSetting("pin", fields[3]) end
+                            self:setup()
+                        end)
+                    else
+                        UIManager:show(InfoMessage:new{ text = _("No laptop answered. Is gemma_bridge.py running, on the same Wi-Fi?") })
+                    end
+                end },
+            },
+            {
+                { text = _("Cancel"), id = "close", callback = function() UIManager:close(dialog) end },
+                { text = _("Connect"), is_enter_default = true, callback = function()
+                    local f = dialog:getFields()
+                    UIManager:close(dialog)
+                    save(f[1], f[2], f[3])
+                end },
+            },
+        },
+    }
+    UIManager:show(dialog)
+    dialog:onShowKeyboard()
+end
+
+function Gemma:launchApp()
+    settings()
+    local window
+    window = AppWindow:open{
+        title = _("Gemma"),
+        max_content_dp = 720,
+        build = function(w, width, height) return self:build(w, width, height) end,
+        on_close = function() State.windows[window] = nil end,
+    }
+    if window then State.windows[window] = true end
+    local NetworkMgr = require("ui/network/manager")
+    NetworkMgr:runWhenConnected(function()
+        if not server() then
+            self:setup()
+            return
+        end
+        local info = request("GET", "/api/info")
+        if info then State.info = info end
+        startPolling()
+    end)
+end
+
+return Gemma
