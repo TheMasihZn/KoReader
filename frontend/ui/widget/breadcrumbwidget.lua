@@ -17,7 +17,7 @@ A segment without a path is displayed but not tappable.
 @usage
     local BreadcrumbWidget = require("ui/widget/breadcrumbwidget")
     local crumbs = BreadcrumbWidget:new{
-        max_width = 400,
+        max_width = Screen:scaleBySize(400),
         segments = { {text = "/", path = "/"}, {text = "mnt", path = "/mnt"} },
         callback = function(path) print("go to", path) end,
         overflow_callback = function() print("tapped …") end,

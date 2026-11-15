@@ -439,7 +439,7 @@ function Gemma:compose(window, prefill)
         title = T(_("Message Gemma · %1"), convTitle(sid)),
         input = prefill or "",
         allow_newline = true,
-        input_height = 4,
+        input_height = 4, -- lines of text, not pixels -- unscaled_size_check: ignore
         -- the row on top of the keyboard (Paste, ⟲) gets ▶ = read Gemma's last reply
         kos_toolbar_audio = { play = function() playLastReply(sid) end },
         buttons = {

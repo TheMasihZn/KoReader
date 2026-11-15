@@ -52,7 +52,7 @@ function Hello:launchApp()
                         width = math.floor(width * 0.8),
                         alignment = "center",
                     },
-                    VerticalSpan:new{ width = 24 },
+                    VerticalSpan:new{ width = require("device").screen:scaleBySize(24) },
                     Button:new{
                         text = _("Tap me"),
                         width = math.floor(width * 0.5),
