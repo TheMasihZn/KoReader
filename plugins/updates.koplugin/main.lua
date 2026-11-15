@@ -29,7 +29,16 @@ local Updates = WidgetContainer:extend{
 
 function Updates:init()
     -- Up and running for a while: the replacement files work, clear the safety counter.
-    UIManager:scheduleIn(15, function() Overrides.markStarted() end)
+    UIManager:scheduleIn(5, function() Overrides.markStarted() end)
+    -- Closing KOReader yourself is never a failed start.
+    if not UIManager._kos_quit_hooked then
+        UIManager._kos_quit_hooked = true
+        local orig_quit = UIManager.quit
+        UIManager.quit = function(...)
+            pcall(Overrides.markStarted)
+            return orig_quit(...)
+        end
+    end
     -- A zip with replacement files, tapped in Files, is offered by the App installer (it calls offerZip).
     self.ui.menu:registerToMainMenu(self)
 end
@@ -183,10 +192,10 @@ function Updates:launchApp()
     local items = {}
     if Overrides.safe_off then
         table.insert(items, {
-            text = _("⚠ Switched off: KOReader didn't start twice"),
+            text = _("⚠ Switched off: KOReader didn't start three times"),
             callback = function()
                 UIManager:show(InfoMessage:new{
-                    text = _("KOReader didn't finish starting twice in a row while replacement files were on, so all of them were switched off.\n\nSwitch them on one at a time (tap) to find the one that breaks."),
+                    text = _("KOReader didn't finish starting three times in a row while replacement files were on, so all of them were switched off.\n\nSwitch them on one at a time (tap) to find the one that breaks."),
                 })
             end,
         })

@@ -9,7 +9,7 @@ ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
 OUT = sys.argv[1] if len(sys.argv) > 1 else os.path.join(ROOT, "2-0-kos-bundle.lua")
 
 # Add-ons shipped with the bundle (text files only; readingcomfort has fonts, so it stays in the APK).
-PLUGINS = ["applauncher", "appinstaller", "studio", "sheets", "latexview", "focus", "gemma", "updates"]
+PLUGINS = ["applauncher", "appinstaller", "studio", "sheets", "latexview", "focus", "gemma", "updates", "icons"]
 ICONS = ["kos.audio.svg", "kos.chat.svg"]
 
 files = {}
@@ -32,6 +32,8 @@ for plugin in PLUGINS:
             full = os.path.join(dirpath, name)
             rel = os.path.relpath(full, os.path.join(ROOT, "plugins"))
             add("overrides/plugins/" + rel, full)
+# The start-up patch (diagnostics, safe mode, path bar, scaling, split-screen).
+add("patches/2-fork-preview.lua", os.path.join(ROOT, "tools/kos-bundle/2-fork-preview.lua"))
 for icon in ICONS:
     add("icons/" + icon, os.path.join(ROOT, "resources/icons/mdlight", icon))
 

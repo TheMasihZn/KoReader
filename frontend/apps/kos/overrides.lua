@@ -13,7 +13,7 @@ and the built-in one is back after a restart.
   is required afterwards uses the replacement. Add-ons (plugins) are not
   affected: they live in koreader/plugins.
 * Each replacement can be switched on/off (koreader/overrides/state.lua).
-* Safety: if KOReader fails to start twice in a row while replacements are on,
+* Safety: if KOReader fails to start three times in a row while replacements are on,
   all of them are switched off by themselves and the Updates app tells you.
 * A replacement that has a syntax error is ignored (the built-in one is used).
 
@@ -338,10 +338,10 @@ function Overrides.install()
             tries = tonumber(f:read("*a")) or 1
             f:close()
         end
-        if tries >= 2 then
+        if tries >= 3 then
             Overrides.safe_off = true
             writeFile(dir .. "/switched-off.txt",
-                os.date("%Y-%m-%d %H:%M") .. ": KOReader didn't finish starting twice with replacement files on, so they were all switched off.\n")
+                os.date("%Y-%m-%d %H:%M") .. ": KOReader didn't finish starting three times in a row with replacement files on, so they were all switched off.\n")
             local state = readState()
             for _, item in ipairs(Overrides.list()) do
                 state[item.module] = state[item.module] or {}
