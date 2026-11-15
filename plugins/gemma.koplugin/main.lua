@@ -258,10 +258,23 @@ local Gemma = WidgetContainer:extend{
 }
 
 function Gemma:init()
+    self:onDispatcherRegisterActions()
     if self.ui and self.ui.menu then
         self.ui.menu:registerToMainMenu(self)
     end
 end
+
+function Gemma:onDispatcherRegisterActions()
+    require("dispatcher"):registerAction("gemma_open", {
+        category = "none", event = "ShowGemma", title = _("Gemma"), general = true,
+    })
+    require("dispatcher"):registerAction("gemma_play_last", {
+        category = "none", event = "GemmaPlayLast", title = _("Gemma: read the last reply aloud"), general = true,
+    })
+end
+
+function Gemma:onShowGemma() self:launchApp() return true end
+function Gemma:onGemmaPlayLast() playLastReply() return true end
 
 function Gemma:addToMainMenu(menu_items)
     menu_items.gemma = {
@@ -362,17 +375,15 @@ function Gemma:build(window, width, height)
 end
 
 function Gemma:compose(prefill)
-    local KeyboardToolbar = require("apps/kos/keyboardtoolbar")
-    local ctx = { audio = { play = playLastReply } }
     local dialog
     dialog = InputDialog:new{
         title = _("Message Gemma"),
         input = prefill or "",
         allow_newline = true,
         input_height = 4,
+        -- the row on top of the keyboard (Paste, ⟲) gets ▶ = read Gemma's last reply
+        kos_toolbar_audio = { play = playLastReply },
         buttons = {
-            -- the row on top of the keyboard: Paste, audio, …
-            KeyboardToolbar.row(ctx),
             {
                 { text = _("Cancel"), id = "close", callback = function() UIManager:close(dialog) end },
                 { text = _("Send"), is_enter_default = true, callback = function()
@@ -383,7 +394,6 @@ function Gemma:compose(prefill)
             },
         },
     }
-    ctx.input = dialog -- Paste goes here
     UIManager:show(dialog)
     dialog:onShowKeyboard()
 end

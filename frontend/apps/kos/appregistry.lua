@@ -50,6 +50,9 @@ AppRegistry.builtins = {
       description = _("Look up a word.") },
     { id = "wikipedia", title = _("Wikipedia"), icon = "appbar.navigation", action = "wikipedia_lookup", order = 8,
       description = _("Look up an article.") },
+    { id = "audio", title = _("Audio"), icon = "kos.audio", order = 9,
+      description = _("Play again what any app read aloud (Gemma, messengers…). Plays through Bluetooth when connected."),
+      launch = function() require("apps/kos/audiopipeline").showRecent() end },
     { id = "settings", title = _("Settings"), icon = "appbar.settings", action = "show_menu", order = 20,
       description = _("The KOReader menu.") },
 }
@@ -112,6 +115,7 @@ function AppRegistry:getApps()
                 icon_args = resolveIcon(b.icon),
                 order = b.order,
                 action = b.action,
+                wrapper_launch = b.launch,
             })
         end
     end

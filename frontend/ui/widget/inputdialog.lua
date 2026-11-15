@@ -264,6 +264,15 @@ function InputDialog:init(reinit)
     elseif self.add_scroll_buttons then -- Up / Down buttons
         self:_addScrollButtons(false)
     end
+    -- KOReader OS: the Paste + audio row right on top of the keyboard (Samsung style)
+    if not self.readonly and self.kos_toolbar ~= false
+            and G_reader_settings:nilOrTrue("kos_keyboard_toolbar") then
+        local ok, KeyboardToolbar = pcall(require, "apps/kos/keyboardtoolbar")
+        if ok then
+            self.buttons = self.buttons or {}
+            table.insert(self.buttons, KeyboardToolbar.row{ input = self, audio = self.kos_toolbar_audio })
+        end
+    end
     -- Buttons Table
     self.button_table = ButtonTable:new{
         width = self.width - 2*self.button_padding,

@@ -139,6 +139,12 @@ function AppLauncher:addToMainMenu(menu_items)
                 checked_func = function() return G_reader_settings:isTrue("applauncher_at_startup") end,
                 callback = function() G_reader_settings:flipNilOrFalse("applauncher_at_startup") end,
             },
+            {
+                text = _("Paste and audio row on the keyboard"),
+                help_text = _("A row on top of every keyboard: Paste, ▶ (read aloud, in apps that can) and ⟲ (repeat the last clip; hold for recent ones)."),
+                checked_func = function() return G_reader_settings:nilOrTrue("kos_keyboard_toolbar") end,
+                callback = function() G_reader_settings:flipNilOrTrue("kos_keyboard_toolbar") end,
+            },
         },
     }
 end
