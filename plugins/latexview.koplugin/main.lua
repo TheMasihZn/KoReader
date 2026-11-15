@@ -124,7 +124,7 @@ function LatexView:launchApp()
         title = _("Long-press a .tex file to open it"),
         select_directory = false,
         select_file = true,
-        path = filemanagerutil.getHomeFolder() or require("datastorage"):getDataDir(),
+        path = require("apps/kos/home").get(),
         file_filter = function(f) return f:lower():match("%.tex$") or f:lower():match("%.ltx$") or f:lower():match("%.latex$") end,
         onConfirm = function(file) self:openFile(file, split_target) end,
     })

@@ -429,7 +429,7 @@ function Studio:package(name)
     local filemanagerutil = require("apps/filemanager/filemanagerutil")
     local errors = Studio.checkProject(projectDir(name))
     local function doPackage()
-        local out_dir = filemanagerutil.getHomeFolder() or DataStorage:getDataDir()
+        local out_dir = require("apps/kos/home").get()
         local zip = out_dir .. "/" .. name .. ".zip"
         local writer = Archiver.Writer:new{}
         local ok = writer:open(zip, "zip")

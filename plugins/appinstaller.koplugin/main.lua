@@ -219,7 +219,7 @@ function AppInstaller.offer(zip_file, open_normally)
 end
 
 -- Tapping a zip anywhere (file browser, history, collections) goes through here.
-if not filemanagerutil._appinstaller_wrapped then
+if type(filemanagerutil.openFile) == "function" and not filemanagerutil._appinstaller_wrapped then
     filemanagerutil._appinstaller_wrapped = true
     local orig_openFile = filemanagerutil.openFile
     filemanagerutil.openFile = function(ui, file, ...)

@@ -31,6 +31,15 @@ local TitleBar = require("ui/widget/titlebar")
 local UIManager = require("ui/uimanager")
 local ffiUtil = require("ffi/util")
 local filemanagerutil = require("apps/filemanager/filemanagerutil")
+local function kosHomeFolder()
+    if type(filemanagerutil.getHomeFolder) == "function" then
+        local ok, dir = pcall(filemanagerutil.getHomeFolder)
+        if ok and type(dir) == "string" and dir ~= "" then return dir end
+    end
+    local dir = G_reader_settings:readSetting("home_dir") or Device.home_dir
+    if type(dir) ~= "string" or dir == "" then dir = require("datastorage"):getDataDir() end
+    return dir
+end
 local lfs = require("libs/libkoreader-lfs")
 local logger = require("logger")
 local util = require("util")
@@ -402,7 +411,7 @@ installBreadcrumbs = function(self)
 end
 
 function FileManager:getPathSegments(path)
-    local home_dir = filemanagerutil.getHomeFolder()
+    local home_dir = kosHomeFolder()
     if home_dir ~= "/" then
         home_dir = home_dir:gsub("/+$", "")
     end
@@ -476,7 +485,7 @@ function FileManager:showGoToPathDialog()
                     local target = util.trim(input_dialog:getInputText())
                     if target == "" then return end
                     if target == "~" or target:sub(1, 2) == "~/" then
-                        target = filemanagerutil.getHomeFolder() .. target:sub(2)
+                        target = kosHomeFolder() .. target:sub(2)
                     elseif target:sub(1, 1) ~= "/" then
                         target = self.file_chooser.path .. "/" .. target
                     end
@@ -975,17 +984,49 @@ local followups = {
     [C.APP_CMD_WINDOW_REDRAW_NEEDED] = true,
 }
 local listen_until = 0
+-- Pulling the notification panel (or a keyboard / system bar change) also sends these
+-- events. Never resize inside the native event itself: wait until the size has stopped
+-- changing (two identical reads 0.35 s apart), ignore impossible sizes, and write
+-- every step to the log so a crash leaves a trail.
+local pending, last_probe = false, nil
+local function probe()
+    local w, h = android.getScreenWidth(), android.getScreenHeight()
+    return (w or 0) .. "x" .. (h or 0), w, h
+end
+local function scheduleCheck(reason)
+    if pending then return end
+    pending = true
+    last_probe = nil
+    local function step()
+        local key, w, h = probe()
+        if not w or not h or w < 100 or h < 100 then
+            plog("resize skipped: odd size", key, reason)
+            pending = false
+            return
+        end
+        if key ~= last_probe then
+            last_probe = key
+            UIManager:scheduleIn(0.35, step)
+            return
+        end
+        pending = false
+        plog("resize check", key, reason)
+        safeCheckWindowSize()
+        plog("resize done")
+    end
+    UIManager:scheduleIn(0.35, step)
+end
 local orig_handleMiscEv = Device.input.handleMiscEv
 Device.input.handleMiscEv = function(this, ev)
     if ev.code == CONFIG_CHANGED then
         listen_until = os.time() + 3
-        safeCheckWindowSize()
+        scheduleCheck("config")
     elseif followups[ev.code] and os.time() <= listen_until then
-        safeCheckWindowSize()
+        scheduleCheck("followup")
     end
     return orig_handleMiscEv(this, ev)
 end
 
 -- In case we were started directly in a split-screen window.
-UIManager:nextTick(safeCheckWindowSize)
+UIManager:scheduleIn(0.5, function() scheduleCheck("start") end)
 plog("all sections loaded")

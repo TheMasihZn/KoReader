@@ -516,7 +516,7 @@ function Sheets:launchApp()
     local split_target = AppWindow.pending_target
     AppWindow.pending_target = nil
     local filemanagerutil = require("apps/filemanager/filemanagerutil")
-    local home = filemanagerutil.getHomeFolder() or require("datastorage"):getDataDir()
+    local home = require("apps/kos/home").get()
     local dialog
     dialog = ButtonDialog:new{
         title = _("Sheets"),

@@ -113,6 +113,7 @@ if not FileHandlers._installed then
     -- Tapping a claimed file opens its app. A type that KOReader can also read
     -- as a document (e.g. .txt) asks which one to use.
     local orig_openFile = filemanagerutil.openFile
+    if type(orig_openFile) == "function" then
     filemanagerutil.openFile = function(ui, file, ...)
         if #FileHandlers:forFile(file) > 0 then
             local args = { n = select("#", ...), ... }
@@ -123,6 +124,7 @@ if not FileHandlers._installed then
             if FileHandlers:open(file, doc_fallback) then return end
         end
         return orig_openFile(ui, file, ...)
+    end
     end
 end
 
