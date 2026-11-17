@@ -162,6 +162,9 @@ function AppLauncher:onDispatcherRegisterActions()
     Dispatcher:registerAction("show_app_launcher", {
         category = "none", event = "ShowAppLauncher", title = _("Home screen"), general = true,
     })
+    Dispatcher:registerAction("show_search", {
+        category = "none", event = "ShowSearch", title = _("Search apps and files"), general = true,
+    })
     Dispatcher:registerAction("show_open_windows", {
         category = "none", event = "ShowOpenWindows", title = _("Open windows (switch app)"), general = true,
     })
@@ -176,6 +179,7 @@ function AppLauncher:addToMainMenu(menu_items)
                 text = _("Open home screen"),
                 callback = function() self:onShowAppLauncher() end,
             },
+            require("apps/kos/usearch").settingsMenu(),
             {
                 text = _("Open at startup"),
                 checked_func = function() return G_reader_settings:nilOrTrue("applauncher_at_startup") end,
@@ -326,6 +330,11 @@ end
 
 -- @param args optional { split = { next_to = Pane, dir = "row"|"column" } }:
 -- the app picked next opens beside that window.
+function AppLauncher:onShowSearch()
+    require("apps/kos/usearch").show()
+    return true
+end
+
 function AppLauncher:onShowOpenWindows()
     require("apps/kos/windows").showSwitcher()
     return true
