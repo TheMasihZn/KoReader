@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
 """Builds a versioned KOReader OS release into dist/.
 
-    python3 tools/kos-bundle/make_release.py [--check-tag TAG]
+    python3 tools/kosBundle/make_release.py [--check-tag TAG]
 
 Reads kos/VERSION, kos/CHANGELOG.md and kos/RELEASE_TEMPLATE.md. Writes dist/ (bundle, apps/*.zip,
-gemma-bridge.zip, OS-embedding.md, RELEASE.md). With --check-tag, fails unless TAG is `kos-v<VERSION>`.
+gemmaBridge.zip, osEmbedding.md, RELEASE.md). With --check-tag, fails unless TAG is `kosV<VERSION>`.
 """
 import datetime, hashlib, os, re, subprocess, sys, zipfile
 
@@ -58,27 +58,27 @@ def main():
         sys.exit("kos/VERSION must look like 0.1.0, got: " + version)
     if "--check-tag" in sys.argv:
         tag = sys.argv[sys.argv.index("--check-tag") + 1]
-        if tag != "kos-v" + version:
-            sys.exit("tag %s does not match kos/VERSION (expected kos-v%s)" % (tag, version))
+        if tag != "kosV" + version:
+            sys.exit("tag %s does not match kos/VERSION (expected kosV%s)" % (tag, version))
     changes = changes_for(version)
 
     os.makedirs(os.path.join(DIST, "apps"), exist_ok=True)
-    bundle = os.path.join(DIST, "2-0-kos-bundle.lua")
-    subprocess.check_call([sys.executable, os.path.join(ROOT, "tools/kos-bundle/build_bundle.py"), bundle])
+    bundle = os.path.join(DIST, "2-kosBundle.lua")
+    subprocess.check_call([sys.executable, os.path.join(ROOT, "tools/kosBundle/build_bundle.py"), bundle])
     for app, _, _ in APPS:
         src = os.path.join(ROOT, "plugins", app + ".koplugin")
         if not os.path.isdir(src):
             sys.exit("missing plugin folder: " + src)
         zip_dir(src, os.path.join(DIST, "apps", app + ".zip"), app + ".koplugin")
-    zip_dir(os.path.join(ROOT, "tools/gemma-bridge"), os.path.join(DIST, "gemma-bridge.zip"), "gemma-bridge")
-    with open(os.path.join(DIST, "OS-embedding.md"), "w", encoding="utf-8") as f:
-        f.write(read("doc/OS-embedding.md"))
+    zip_dir(os.path.join(ROOT, "tools/gemmaBridge"), os.path.join(DIST, "gemmaBridge.zip"), "gemmaBridge")
+    with open(os.path.join(DIST, "osEmbedding.md"), "w", encoding="utf-8") as f:
+        f.write(read("doc/osEmbedding.md"))
 
     try:
         commit = subprocess.check_output(["git", "rev-parse", "--short", "HEAD"], cwd=ROOT, text=True).strip()
     except Exception:
         commit = "unknown"
-    files = ["2-0-kos-bundle.lua", "gemma-bridge.zip", "OS-embedding.md"] + ["apps/%s.zip" % a for a, _, _ in APPS]
+    files = ["2-kosBundle.lua", "gemmaBridge.zip", "osEmbedding.md"] + ["apps/%s.zip" % a for a, _, _ in APPS]
     checksums = "\n".join("`%s`  %s" % (sha(os.path.join(DIST, p))[:16], p) for p in files)
     apps = "\n".join("| %s | %s.zip | %s |" % (label, app, needs) for app, label, needs in APPS)
     notes = read("kos/RELEASE_TEMPLATE.md").format(

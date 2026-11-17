@@ -1,7 +1,7 @@
 --[[--
 Debugger for KOReader OS apps.
 
-1. Trail. Before an app starts, "launching <app>" is written to koreader/kos-debug.log; when it
+1. Trail. Before an app starts, "launching <app>" is written to koreader/kosDebug.log; when it
    starts fine, "started"; when it raises an error, "error: ...". The note is cleared a few
    seconds after a good start. If KOReader dies while an app starts (a native crash no Lua code can
    catch), the note is still there at the next start: you are told which app did it, and it can
@@ -22,7 +22,7 @@ local UIManager = require("ui/uimanager")
 
 local Debugger = {}
 
-local LOG = DataStorage:getDataDir() .. "/kos-debug.log"
+local LOG = DataStorage:getDataDir() .. "/kosDebug.log"
 
 function Debugger.log(...)
     local parts = {}

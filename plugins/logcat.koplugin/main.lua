@@ -2,7 +2,7 @@
 Logcat: a colour-coded log viewer for KOReader OS.
 
 Sources: the Android log (this app's own process, no permission needed),
-koreader/fork-preview.log and koreader/crash.log. Filter by level and text.
+koreader/forkPreview.log and koreader/crash.log. Filter by level and text.
 Newest lines come first on screen; "Older" pages backwards.
 ]]
 
@@ -67,7 +67,7 @@ local function readSource(id)
         p:close()
         return lines
     end
-    local name = id == "fork" and "fork-preview.log" or id == "trace" and "kos-trace.log" or id == "debug" and "kos-debug.log" or "crash.log"
+    local name = id == "fork" and "forkPreview.log" or id == "trace" and "kosTrace.log" or id == "debug" and "kosDebug.log" or "crash.log"
     local lines = readFile(DataStorage:getDataDir() .. "/" .. name)
     if not lines then return nil, name .. " " .. _("does not exist yet.") end
     return lines

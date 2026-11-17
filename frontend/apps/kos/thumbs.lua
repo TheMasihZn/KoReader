@@ -8,7 +8,7 @@ kept in ONE shared cache with a size cap, oldest removed first.
     Thumbs.cacheInfo()                               -- { files, bytes, cap }
     Thumbs.clear()
 
-Cache: <data>/cache/kos-thumbs/<key>.png. Cap: setting `kos_thumb_cache_mb` (default 100).
+Cache: <data>/cache/kosThumbs/<key>.png. Cap: setting `kos_thumb_cache_mb` (default 100).
 Nothing is made up front: a folder with 5000 files costs nothing until you look at one.
 ]]
 
@@ -23,7 +23,7 @@ local DOC_EXT = { epub = true, pdf = true, djvu = true, cbz = true, fb2 = true, 
 local TEXT_EXT = { txt = true, md = true, lua = true, log = true, csv = true, tex = true, json = true, py = true, ini = true, conf = true, sh = true }
 
 function Thumbs.dir()
-    local d = DataStorage:getDataDir() .. "/cache/kos-thumbs"
+    local d = DataStorage:getDataDir() .. "/cache/kosThumbs"
     if lfs.attributes(d, "mode") ~= "directory" then
         lfs.mkdir(DataStorage:getDataDir() .. "/cache")
         lfs.mkdir(d)

@@ -1,9 +1,9 @@
-# KOReader OS release: push a tag `kos-v<version>` (version = kos/VERSION) and this builds and publishes it.
-name: kos-release
+# KOReader OS release: push a tag `kosV<version>` (version = kos/VERSION) and this builds and publishes it.
+name: kosRelease
 
 on:
   push:
-    tags: ["kos-v*"]
+    tags: ["kosV*"]
   workflow_dispatch:  # manual dry run: builds and uploads the files as a build artifact, publishes nothing
 
 permissions:
@@ -18,16 +18,16 @@ jobs:
       - name: Lua syntax check
         run: |
           sudo apt-get update -qq && sudo apt-get install -y -qq lua5.1
-          find frontend/apps/kos plugins/*.koplugin tools/kos-bundle -name '*.lua' | while read f; do
+          find frontend/apps/kos plugins/*.koplugin tools/kosBundle -name '*.lua' | while read f; do
             luac5.1 -p "$f" || exit 1
           done
 
       - name: Build release files
         run: |
           if [ "${GITHUB_REF_TYPE}" = "tag" ]; then
-            python3 tools/kos-bundle/make_release.py --check-tag "${GITHUB_REF_NAME}"
+            python3 tools/kosBundle/make_release.py --check-tag "${GITHUB_REF_NAME}"
           else
-            python3 tools/kos-bundle/make_release.py
+            python3 tools/kosBundle/make_release.py
           fi
 
       - name: Publish GitHub release
@@ -36,13 +36,13 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           gh release create "${GITHUB_REF_NAME}" \
-            --title "KOReader OS ${GITHUB_REF_NAME#kos-v}" \
+            --title "KOReader OS ${GITHUB_REF_NAME#kosV}" \
             --notes-file dist/RELEASE.md \
-            dist/2-0-kos-bundle.lua dist/gemma-bridge.zip dist/OS-embedding.md dist/apps/*.zip
+            dist/2-kosBundle.lua dist/gemmaBridge.zip dist/osEmbedding.md dist/apps/*.zip
 
       - name: Keep files from a manual run
         if: github.ref_type != 'tag'
         uses: actions/upload-artifact@v4
         with:
-          name: kos-release-dry-run
+          name: kosReleaseDryRun
           path: dist/

@@ -4,7 +4,7 @@ Input layer: the one door the OS's local model (or any script) uses to act like 
 It sends taps, swipes and typed text through KOReader's normal event path,
 the same one your finger uses, so nothing happens that you could not do by hand.
 Every action is drawn on a small overlay (a ring where it lands) and appended to
-`koreader/kos-trace.log` as one line: time, who, action, details, result.
+`koreader/kosTrace.log` as one line: time, who, action, details, result.
 
     local IL = require("apps/kos/inputlayer")
     IL.tap(300, 500, "gemma")
@@ -22,7 +22,7 @@ local UIManager = require("ui/uimanager")
 
 local IL = { enabled = true, overlay = true }
 
-local TRACE = DataStorage:getDataDir() .. "/kos-trace.log"
+local TRACE = DataStorage:getDataDir() .. "/kosTrace.log"
 
 --- One trace line. Kept small: the file is cut when it passes 300 KB.
 function IL.format(who, action, detail, result)

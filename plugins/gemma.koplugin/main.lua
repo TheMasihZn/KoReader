@@ -1,5 +1,5 @@
 --[[--
-Gemma: the phone side of the Gemma bridge (tools/gemma-bridge/gemma_bridge.py
+Gemma: the phone side of the Gemma bridge (tools/gemmaBridge/gemma_bridge.py
 runs on the laptop, in front of Ollama).
 
 * Same conversation as the laptop: both read and write the bridge's sessions.

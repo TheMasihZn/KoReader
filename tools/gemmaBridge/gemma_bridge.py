@@ -11,14 +11,14 @@ phone (KOReader OS "Gemma" app) see and continue the same conversation.
 Only Python's standard library is used (Ubuntu: nothing to install).
 
 Reliability ("repeat / cache"):
-* Every message is saved to disk (~/.gemma-bridge/sessions/*.json) as it changes.
+* Every message is saved to disk (~/.gemmaBridge/sessions/*.json) as it changes.
 * Each message a client sends carries its own id: sending it again (e.g. after
   Wi-Fi dropped) never creates a duplicate.
 * Replies are generated on the laptop even if the phone disconnects; the phone
   picks up the finished answer when it reconnects.
 
 Security: the phone needs the PIN printed at start-up (kept in
-~/.gemma-bridge/config.json). The laptop itself (localhost) needs no PIN.
+~/.gemmaBridge/config.json). The laptop itself (localhost) needs no PIN.
 """
 
 import argparse
@@ -36,7 +36,10 @@ import urllib.request
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from urllib.parse import parse_qs, urlparse
 
-APP_DIR = os.path.expanduser("~/.gemma-bridge")
+APP_DIR = os.path.expanduser("~/.gemmaBridge")
+_OLD_DIR = os.path.expanduser("~/.gemma-bridge")  # renamed: keep existing conversations
+if os.path.isdir(_OLD_DIR) and not os.path.exists(APP_DIR):
+    os.rename(_OLD_DIR, APP_DIR)
 SESSIONS_DIR = os.path.join(APP_DIR, "sessions")
 CONFIG_FILE = os.path.join(APP_DIR, "config.json")
 AUDIO_DIR = os.path.join(APP_DIR, "audio")
@@ -549,7 +552,7 @@ def main():
     print(f"  Laptop:  http://localhost:{args.port}")
     print(f"  Phone:   open the Gemma app in KOReader. Address {ip}:{args.port}, PIN {cfg['pin']}")
     print(f"  Shared folder: {fileshare.share_root(cfg)}  (files you send from the phone land here)")
-    print("  Stop with Ctrl+C. Conversations are kept in ~/.gemma-bridge/")
+    print("  Stop with Ctrl+C. Conversations are kept in ~/.gemmaBridge/")
     try:
         server.serve_forever()
     except KeyboardInterrupt:

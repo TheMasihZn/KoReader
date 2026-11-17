@@ -9,4 +9,4 @@ Write what changed in plain facts, one line each.
 - Input layer, Logcat, debugger with crash trail, Share with laptop bridge, Preview thumbnails.
 - Pendulums and Light lab (double slit), LaTeX art library, physics library, simulation window.
 - Common library for "needs / under development" notices.
-- Release packaging and CI (this file, `kos/VERSION`, `.github/workflows/kos-release.yml`).
+- Release packaging and CI (this file, `kos/VERSION`, `.github/workflows/kosRelease.yml`).

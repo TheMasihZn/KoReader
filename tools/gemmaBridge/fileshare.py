@@ -1,6 +1,6 @@
 """Shared folder for the phone: list, download, upload. Used by gemma_bridge.py.
 
-The shared folder is ~/KOS-Share (or "share_dir" in ~/.gemma-bridge/config.json).
+The shared folder is ~/kosShare (or "share_dir" in ~/.gemmaBridge/config.json).
 Everything is relative to it; paths that leave it (.., links) are refused.
 """
 import os
@@ -11,7 +11,7 @@ MAX_UPLOAD = 2 * 1024 * 1024 * 1024  # 2 GB, a sanity limit
 
 
 def share_root(cfg):
-    root = os.path.expanduser(cfg.get("share_dir") or "~/KOS-Share")
+    root = os.path.expanduser(cfg.get("share_dir") or "~/kosShare")
     os.makedirs(root, exist_ok=True)
     return os.path.realpath(root)
 

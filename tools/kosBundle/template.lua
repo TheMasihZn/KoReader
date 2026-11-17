@@ -1,5 +1,5 @@
 -- KOReader OS bundle: ONE file that installs everything.
--- Put it in koreader/patches/ (named 2-0-kos-bundle.lua) and restart KOReader.
+-- Put it in koreader/patches/ (named 2-kosBundle.lua) and restart KOReader.
 -- On start it unpacks its files into the koreader folder (once per version), then
 -- switches them on. It never changes KOReader's own files: delete this file and
 -- the koreader/overrides folder to go back.
@@ -59,14 +59,20 @@ local ok_unpack, written = pcall(function()
     G_reader_settings:flush()
     return n
 end)
-if not ok_unpack then io.stderr:write("[kos-bundle] unpack failed: ", tostring(written), "\n") end
+-- Old hyphenated file names (before 0.1.0 camelCase rename): remove them so nothing loads twice.
+pcall(function()
+    for _, old in ipairs({ "/patches/2-0-kos-bundle.lua", "/patches/2-fork-preview.lua" }) do
+        if lfs.attributes(data .. old, "mode") == "file" then os.remove(data .. old) end
+    end
+end)
+if not ok_unpack then io.stderr:write("[kosBundle] unpack failed: ", tostring(written), "\n") end
 
 -- 1. Replacement app files and add-ons ------------------------------------
 local boot = data .. "/overrides/boot/overrides.lua"
 if not package.loaded["apps/kos/overrides"] and lfs.attributes(boot, "mode") == "file" then
     local chunk, err = loadfile(boot)
     if chunk then package.preload["apps/kos/overrides"] = chunk
-    else io.stderr:write("[kos-bundle] ", tostring(err), "\n") end
+    else io.stderr:write("[kosBundle] ", tostring(err), "\n") end
 end
 local ok, Overrides = pcall(require, "apps/kos/overrides")
 if ok and type(Overrides) == "table" then
@@ -74,9 +80,9 @@ if ok and type(Overrides) == "table" then
         Overrides.install()
         Overrides.hookPlugins()
     end)
-    if not ok2 then io.stderr:write("[kos-bundle] ", tostring(err), "\n") end
+    if not ok2 then io.stderr:write("[kosBundle] ", tostring(err), "\n") end
 else
-    io.stderr:write("[kos-bundle] ", tostring(Overrides), "\n")
+    io.stderr:write("[kosBundle] ", tostring(Overrides), "\n")
 end
 
 -- 2. The Paste + audio row on top of every keyboard ----------------------------

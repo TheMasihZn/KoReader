@@ -1,8 +1,8 @@
 --[[--
-Share: files between this device and the laptop's shared folder (~/KOS-Share).
+Share: files between this device and the laptop's shared folder (~/kosShare).
 
 Open it from Home, or long-press any file → "Send to laptop".
-Downloads land in <home folder>/KOS-Share/. The laptop address and PIN are the
+Downloads land in <home folder>/kosShare/. The laptop address and PIN are the
 ones set in the Gemma app.
 ]]
 
@@ -91,14 +91,14 @@ function Share.upload(file, rel)
 end
 
 local function downloadDir()
-    local d = require("apps/kos/home").get() .. "/KOS-Share"
+    local d = require("apps/kos/home").get() .. "/kosShare"
     if lfs.attributes(d, "mode") ~= "directory" then lfs.mkdir(d) end
     return d
 end
 
 local function say(text) UIManager:show(InfoMessage:new{ text = text, timeout = 4 }) end
 
---- Browse the laptop folder `dir` (relative to ~/KOS-Share).
+--- Browse the laptop folder `dir` (relative to ~/kosShare).
 function Share:browse(dir, menu)
     dir = dir or ""
     local data, err = getJSON("/api/files?path=" .. U.encode(dir))

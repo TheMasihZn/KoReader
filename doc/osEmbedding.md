@@ -19,13 +19,13 @@ a structure or common library is added. Source: `frontend/apps/kos/`, `plugins/`
 | `keyboardtoolbar` | Row above every keyboard: Paste, read-aloud, repeat. | Input-method extension point. |
 | `audiopipeline` | `play{url,title,source}`, repeat last, recent clips. | Audio routing service (Bluetooth, per-app). |
 | `home` | `Home.get()` home folder on any build. | Home-folder lookup with a fallback chain. |
-| `inputlayer` | One door to act like a user: `tap`, `hold`, `swipe`, `type`, `key(name)`, `keyNames()`, `listen(fn)`. Draws a ring on the overlay and logs each action to `kos-trace.log`. `enabled=false` blocks all. | Input injection service with a visible overlay and a trace; the local model uses it. Android system buttons need an accessibility service or ADB. |
-| `debugger` | Start-up trail (`kos-debug.log`), crash detection with "switch app off", layout bounds overlay. | Per-app crash note and a debug overlay in the compositor. |
+| `inputlayer` | One door to act like a user: `tap`, `hold`, `swipe`, `type`, `key(name)`, `keyNames()`, `listen(fn)`. Draws a ring on the overlay and logs each action to `kosTrace.log`. `enabled=false` blocks all. | Input injection service with a visible overlay and a trace; the local model uses it. Android system buttons need an accessibility service or ADB. |
+| `debugger` | Start-up trail (`kosDebug.log`), crash detection with "switch app off", layout bounds overlay. | Per-app crash note and a debug overlay in the compositor. |
 | `common` | `needs` and "under development" notices. **Rule: nothing is added without the owner's say-so.** | Shared app-requirements check (device, driver, network). |
 | `latexart` | Scenes (line, circle, rect, dot, path, text) as LaTeX art: `tikz(scene)` real TikZ source, `paint(scene, bb, …)` pixels, `unicode(tex)` formula as text. | A vector scene format and a renderer for a virtual display. |
 | `simwindow` | Simulation window: LaTeX-art picture, the formulas of this frame, Play/Step/Reset/Parameters/LaTeX source (saves the frame as .tex). A frame = one step. | Frame loop with a per-frame record. |
 | `physlab` | `pendulum` (N pendulums, exact equations, RK4, energy check, per-frame formulas) and `slits` (one or two slits, photons landing by chance, histogram entropy, per-frame formulas). | A simulation step API: state, step, per-frame record. |
-| `thumbs` | On-demand thumbnails in one cache (`cache/kos-thumbs`, cap `kos_thumb_cache_mb`, oldest first). | Shared thumbnail service with a size cap shown honestly. |
+| `thumbs` | On-demand thumbnails in one cache (`cache/kosThumbs`, cap `kos_thumb_cache_mb`, oldest first). | Shared thumbnail service with a size cap shown honestly. |
 
 ## 2. Apps (Home)
 
@@ -37,25 +37,25 @@ Preview, Pendulums, Light lab (plugins).
 
 | Path (under the KOReader data folder) | Purpose |
 | --- | --- |
-| `patches/2-0-kos-bundle.lua` | The one-file installer. |
-| `fork-preview.log` | Start-up and resize log of the patch. |
-| `kos-trace.log` | Every action from `inputlayer`. |
-| `kos-debug.log` | App start trail and crashes. |
-| `cache/kos-thumbs/` | Thumbnail cache. |
+| `patches/2-kosBundle.lua` | The one-file installer. |
+| `forkPreview.log` | Start-up and resize log of the patch. |
+| `kosTrace.log` | Every action from `inputlayer`. |
+| `kosDebug.log` | App start trail and crashes. |
+| `cache/kosThumbs/` | Thumbnail cache. |
 | `icons/`, `icons-src/` | User icons and their drawings. |
 | `overrides/` | Replacement files for built-in apps. |
 | `settings/kos_gemma.lua` | Laptop address and PIN. |
-| `<home>/KOS-Share/` | Files fetched from the laptop. |
+| `<home>/kosShare/` | Files fetched from the laptop. |
 
 Settings keys: `kos_flat_design`, `kos_flat_lines`, `kos_flat_radius`, `kos_home_order`, `kos_home_sort`,
 `kos_home_cols`, `kos_home_icon`, `kos_home_landing`, `applauncher_at_startup`, `kos_keyboard_toolbar`,
 `kos_layout_bounds`, `kos_disabled_apps`, `kos_thumb_cache_mb`, `android_ignore_volume_keys`.
 
-## 4. Network contract (laptop bridge, `tools/gemma-bridge/`)
+## 4. Network contract (laptop bridge, `tools/gemmaBridge/`)
 
 Port 8765 (HTTP), UDP 47801 discovery ("GEMMA-BRIDGE?"), header `X-Bridge-Pin`. Chat: `/api/sessions`,
 `/api/sessions/<id>/messages?since=&wait=`, audio `/api/audio/<sid>/<id>.wav`. Files: `/api/files?path=`,
-`/api/files/get?path=`, `PUT /api/files/put?path=` under `~/KOS-Share`. Paths that leave the folder are refused.
+`/api/files/get?path=`, `PUT /api/files/put?path=` under `~/kosShare`. Paths that leave the folder are refused.
 
 ## 5. Not built yet (parked)
 
@@ -99,7 +99,7 @@ cannot tell the difference except by speed. The GPU driver in section 6 is the f
    phone camera acting as a laptop webcam), a file or recording, or a generator. The user chooses.
 4. **Capability descriptor.** Every device says what it really supports (formats, rates, sizes), so programs
    adapt instead of failing.
-5. **Trace.** Every emulated device logs its calls in the same trace format as `inputlayer` (`kos-trace.log`
+5. **Trace.** Every emulated device logs its calls in the same trace format as `inputlayer` (`kosTrace.log`
    style), so what an emulated device did is always visible.
 6. **Honesty switch.** A setting for how an emulated device reports itself: as the real model it imitates, or
    as "software". Default: say what it is.

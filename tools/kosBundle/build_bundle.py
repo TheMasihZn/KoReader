@@ -1,12 +1,12 @@
 #!/usr/bin/env python3
-"""Builds the one-file KOReader OS installer: koreader/patches/2-0-kos-bundle.lua.
+"""Builds the one-file KOReader OS installer: koreader/patches/2-kosBundle.lua.
 
-    python3 tools/kos-bundle/build_bundle.py [output.lua]
+    python3 tools/kosBundle/build_bundle.py [output.lua]
 """
 import hashlib, os, sys
 
 ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
-OUT = sys.argv[1] if len(sys.argv) > 1 else os.path.join(ROOT, "2-0-kos-bundle.lua")
+OUT = sys.argv[1] if len(sys.argv) > 1 else os.path.join(ROOT, "2-kosBundle.lua")
 
 # Add-ons shipped with the bundle (text files only; readingcomfort has fonts, so it stays in the APK).
 PLUGINS = ["applauncher", "appinstaller", "studio", "sheets", "latexview", "focus", "gemma", "updates", "icons", "logcat", "preview", "share", "pendulums", "lightlab"]
@@ -33,7 +33,7 @@ for plugin in PLUGINS:
             rel = os.path.relpath(full, os.path.join(ROOT, "plugins"))
             add("overrides/plugins/" + rel, full)
 # The start-up patch (diagnostics, safe mode, path bar, scaling, split-screen).
-add("patches/2-fork-preview.lua", os.path.join(ROOT, "tools/kos-bundle/2-fork-preview.lua"))
+add("patches/2-forkPreview.lua", os.path.join(ROOT, "tools/kosBundle/2-forkPreview.lua"))
 for icon in ICONS:
     add("icons/" + icon, os.path.join(ROOT, "resources/icons/mdlight", icon))
 
@@ -50,7 +50,7 @@ for rel in sorted(files):
 version = digest.hexdigest()[:10]
 
 body = "".join("    [%r] = %s,\n" % (rel, literal(files[rel])) for rel in sorted(files))
-with open(os.path.join(ROOT, "tools/kos-bundle/template.lua"), encoding="utf-8") as f:
+with open(os.path.join(ROOT, "tools/kosBundle/template.lua"), encoding="utf-8") as f:
     template = f.read()
 out = template.replace("@@VERSION@@", version).replace("@@FILES@@", body.rstrip("\n"))
 with open(OUT, "w", encoding="utf-8", newline="\n") as f:

@@ -17,7 +17,7 @@ on a stock KOReader install (not the F-Droid build, which ignores patches).
   5. Long-press on text in PDFs never runs OCR: the text layer is used
      (OCR only with the document's "Force OCR" option).
 
-Install: copy this file to  koreader/patches/2-fork-preview.lua
+Install: copy this file to  koreader/patches/2-forkPreview.lua
 then restart KOReader. Remove the file to undo.
 --]]
 
@@ -51,7 +51,7 @@ local T = ffiUtil.template
 ------------------------------------------------------------------------
 local PATCH_VERSION = "9"
 local DataStorage = require("datastorage")
-local LOG_FILE = DataStorage:getDataDir() .. "/fork-preview.log"
+local LOG_FILE = DataStorage:getDataDir() .. "/forkPreview.log"
 local function plog(...)
     local parts = {}
     for i = 1, select("#", ...) do parts[#parts + 1] = tostring((select(i, ...))) end
@@ -130,7 +130,7 @@ do
     end
 end
 if SAFE then
-    -- No error screen: a short note, and the details are in koreader/fork-preview.log.
+    -- No error screen: a short note, and the details are in koreader/forkPreview.log.
     UIManager:scheduleIn(3, function()
         UIManager:show(InfoMessage:new{
             text = "Some newer features are paused after a failed start. They try again on the next start.",

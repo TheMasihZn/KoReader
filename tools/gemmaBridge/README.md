@@ -33,7 +33,7 @@ Home → **Gemma** → ⋯ → **Connect to laptop** → **Find on Wi-Fi** (or t
 
 ## What's kept where
 
-- Laptop: `~/.gemma-bridge/sessions/` (conversations), `~/.gemma-bridge/audio/` (spoken replies, made once and reused), `~/.gemma-bridge/config.json` (the PIN).
+- Laptop: `~/.gemmaBridge/sessions/` (conversations), `~/.gemmaBridge/audio/` (spoken replies, made once and reused), `~/.gemmaBridge/config.json` (the PIN).
 - Phone: `koreader/settings/kos_gemma.lua` (copy of the conversation, plus the outbox) and `kos_audio.lua` (recently played clips).
 
 ## For other apps (messengers…)
@@ -43,8 +43,8 @@ Home → **Gemma** → ⋯ → **Connect to laptop** → **Find on Wi-Fi** (or t
 
 ## Shared folder (Share app)
 
-The bridge also serves a shared folder, `~/KOS-Share` (change it with `"share_dir"` in
-`~/.gemma-bridge/config.json`). On the phone open **Share** on Home: browse the folder, tap a
-file to download it into `<home>/KOS-Share/`, or send a file from the phone. Long-press any
+The bridge also serves a shared folder, `~/kosShare` (change it with `"share_dir"` in
+`~/.gemmaBridge/config.json`). On the phone open **Share** on Home: browse the folder, tap a
+file to download it into `<home>/kosShare/`, or send a file from the phone. Long-press any
 file in the file manager → **Send to laptop**. Paths that try to leave the folder are refused.
 Keep `fileshare.py` next to `gemma_bridge.py`.
