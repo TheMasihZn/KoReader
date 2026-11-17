@@ -153,11 +153,14 @@ an app window like any other.
 ## 10. Stack order (declared, not built)
 
 Opposite of today's Android: not Android, then Java, then an APK with a Lua engine inside it.
-The target is the Lua engine directly on the OS, with the shell and our apps on top of it.
+The target is the Lua engine directly on the lightest AOSP kernel, with the shell and our apps on top of it.
+To get there the boilerplate is removed. The user names three kinds: temporal, spatial and energetical.
+My reading of them (to confirm): temporal = waiting or repeating for no reason (start-up delays, polling,
+animations); spatial = memory or storage held without being needed (unused services, libraries, duplicate
+copies); energetical = power spent while doing nothing useful (wake-ups, background syncs, idle radios).
 
-- Base: the lightest possible Android base (AOSP) or Linux, running only the processes the user wants.
 - Lua is the interface and lifecycle interpreter, where Kotlin or Java would be on stock Android.
-- Java is on demand: either embedded with our apps, or one shared Java runtime started when the Lua menu or Home
+- Java is on demand: embedded with our apps, or one shared Java runtime started when the Lua menu or Home
   screen opens an Android app. Apps that do not need Java never start it.
 - Targets: every device the OS is installed on. The Kindle stays KOReader on its own Linux (no AOSP, no Java).
 - Open: the AOSP route for PC hardware (Android-x86 style builds, a virtual machine, or an own x86 build) and
@@ -192,3 +195,68 @@ The target is the Lua engine directly on the OS, with the shell and our apps on 
 
 Open question for the user: what "transparency settings" means. Window see-through level, or a per-app page
 that shows what the app is, where it came from, what it runs and what it can access.
+
+## 14. Settings, grouped by time, space and energy (declared)
+
+- The classic settings menu goes out of sight. Every setting sits under one of three groups: time, space,
+  energy. First version hides KOReader's own settings behind the groups instead of deleting them; search finds
+  any old setting by its familiar name (for example "brightness") and opens the right place.
+- The tree is derived from entropy: a setting that changes many futures sits near the top, fine details deep.
+  Formula: see section 17. Until the user's own formula is defined, the stand-in is Shannon entropy, and it is
+  labelled as a stand-in wherever it appears.
+- A simulation takes cases (which settings are used, in which order) and shows the tree it computes.
+  Not built.
+- Open: where volume, brightness and contrast go (contrast is the user's outcome-based replacement for brightness).
+
+## 15. Home as a chat, one input box, pipelines, bots (declared)
+
+- Home shows each app as a short plain message line, like a Telegram chat with the bubble backgrounds removed
+  (Focus, History, Favorites as lines in a column).
+- One text box sits on every screen. It takes raw text from any connected keyboard (on-screen, Bluetooth, USB).
+  Built on `inputlayer`.
+- Pipelines: a chain of small steps, text in and text out. A step is an AI model or a plain program.
+  A pipeline can end at a web client.
+- Bots: Telegram first (official bot API). WhatsApp has no free official route for personal accounts and
+  automating one can get the number banned, so it waits.
+- Open: whether the icon grid stays as an option; whether a bot answers, acts for the user, or both.
+
+## 16. One root and universal search (declared)
+
+- One root, not the root of a traditional OS: the user's own space ("my space", name not final). It is the default
+  folder. Inside: Desktop, Downloads, Documents, cache. System folders stay out of the paths the user browses.
+- Open: the user's example put Documents inside Downloads. Intended nesting or just an example?
+- Universal search is always available. It searches while the user types, triggered by character count
+  (settable). Search places: system ones fixed and always set, the user can add their own (for example Desktop,
+  Downloads). Tied to the one text box in section 15.
+
+## 17. Formulas used in documents (the rule and the list)
+
+Rule from the user: whenever a section rests on a formula, the document names it, so the section can later be
+optimised by it and the gain measured. Where only a time is measured, a time is written, not an entropy.
+
+Shannon information entropy, in bits:  $H = -\sum_i p_i \log_2 p_i$
+
+Gibbs and Boltzmann thermal entropy:  $S = -k_B \sum_i p_i \ln p_i = k_B \ln W$ (equal probabilities)
+
+Bekenstein and Hawking black hole entropy:  $S = \dfrac{k_B c^3 A}{4 G \hbar}$ (grows with horizon area A).
+Whether information comes back out as the hole evaporates is debated; the leading view is that it does
+(Page curve), unsettled.
+
+Landauer limit, least energy to erase one bit:  $E \ge k_B T \ln 2$
+
+Framal Entropy (the user's): defined by frames of positions $\mu$ and events $\rho$; the entropy itself is not
+yet written down. Two sides: forward (how open the future is from a frame) and surprise (reality against
+prediction). Section 14 uses Shannon until it is defined.
+
+| Section | Minimise | Formula |
+| --- | --- | --- |
+| 14 Settings tree | uncertainty a setting leaves | Shannon, stand-in |
+| 15 Input and Home | response delay of the box | a time, no entropy |
+| 10 Boilerplate (energy) | energy per erased bit, idle power | Landauer, measured power |
+| Light lab | photon pattern spread | Shannon (not Framal) |
+
+## 18. Snapshot file (declared)
+
+One plain Markdown file holding where an unfinished discussion stands: decisions made, open questions, next step,
+and the formulas in play (LaTeX). Plain KOReader opens it without the OS; the user hands it to an agent to
+continue from that point. Not built. Suggested name: `<topic>.snapshot.md`.
