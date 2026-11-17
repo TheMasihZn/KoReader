@@ -90,8 +90,8 @@ local function stroke(bb, ax, ay, bx, by, w, color)
     end
 end
 
--- Fills a polygon (points in pixels) one row at a time.
-local function fillPolygon(bb, pts, color)
+-- Fills a polygon (points in pixels) one row at a time. `more`: extra rings (holes or islands), even-odd.
+local function fillPolygon(bb, pts, color, more)
     local miny, maxy = math.huge, -math.huge
     for _, p in ipairs(pts) do
         miny, maxy = math.min(miny, p[2]), math.max(maxy, p[2])
@@ -107,6 +107,17 @@ local function fillPolygon(bb, pts, color)
             end
             j = i
         end
+        for _, ring in ipairs(more or {}) do
+            local rj = #ring
+            for i = 1, #ring do
+                local yi, yj = ring[i][2], ring[rj][2]
+                if (yi <= y + 0.5) ~= (yj <= y + 0.5) then
+                    local t = (y + 0.5 - yi) / (yj - yi)
+                    xs[#xs + 1] = ring[i][1] + t * (ring[rj][1] - ring[i][1])
+                end
+                rj = i
+            end
+        end
         table.sort(xs)
         for k = 1, #xs - 1, 2 do
             local x1, x2 = math.floor(xs[k]), math.ceil(xs[k + 1])
@@ -120,7 +131,15 @@ local function drawShape(bb, shape, ox, oy, scale, color)
     if #pts == 0 then return end
     local px = {}
     for i, p in ipairs(pts) do px[i] = { ox + p[1] * scale, oy + p[2] * scale } end
-    if shape.fill and closed and #px > 2 then fillPolygon(bb, px, color) end
+    local more
+    if shape.rings then
+        more = {}
+        for k, ring in ipairs(shape.rings) do
+            more[k] = {}
+            for i, p in ipairs(ring) do more[k][i] = { ox + p[1] * scale, oy + p[2] * scale } end
+        end
+    end
+    if shape.fill and closed and #px > 2 then fillPolygon(bb, px, color, more) end
     local w = math.max(1, math.floor((shape.width or 2) * scale + 0.5))
     if #px == 1 then
         dot(bb, px[1][1], px[1][2], w, color)
@@ -131,6 +150,12 @@ local function drawShape(bb, shape, ox, oy, scale, color)
     end
     if closed then
         stroke(bb, px[#px][1], px[#px][2], px[1][1], px[1][2], w, color)
+    end
+    for _, ring in ipairs(more or {}) do
+        for i = 1, #ring do
+            local a, b = ring[i], ring[i % #ring + 1]
+            stroke(bb, a[1], a[2], b[1], b[2], w, color)
+        end
     end
 end
 
@@ -388,6 +413,7 @@ function Icons:build(window, width, height)
     local row4 = {
         { text = _("New"), callback = function() self:askDiscard(window, function() self:resetSession(window) end) end },
         { text = _("Open…"), callback = function() self:askDiscard(window, function() self:chooseIcon(window) end) end },
+        { text = _("Suits…"), callback = function() self:askDiscard(window, function() self:chooseSuit(window) end) end },
         { text = _("Save"), font_bold = true, callback = function() self:save(window) end },
     }
     local buttons = ButtonTable:new{
@@ -511,6 +537,51 @@ function Icons:chooseIcon(window)
                     UIManager:close(menu)
                     self:chooseIcon(window)
                 end,
+            })
+            return true
+        end,
+        close_callback = function() UIManager:close(menu) end,
+    }
+    UIManager:show(menu)
+end
+
+--- The Holy Cart library: 302 suit symbols, each made by a formula. Tap to open one as a drawing you
+-- can change; hold to read its formula.
+function Icons:chooseSuit(window)
+    local here = (debug.getinfo(1, "S").source or ""):match("^@(.*)/[^/]*$") or "."
+    local chunk = loadfile(here .. "/holycart.lua")
+    local ok, suits = false, nil
+    if chunk then ok, suits = pcall(chunk) end
+    if not ok or type(suits) ~= "table" then
+        UIManager:show(InfoMessage:new{ text = _("The Holy Cart suits are not installed (holycart.lua is missing)."), icon = "notice-warning" })
+        return
+    end
+    local items = {}
+    for _, su in ipairs(suits) do
+        table.insert(items, { text = su.id:gsub("^suit%-", "") .. "  " .. su.name, mandatory = su.family, suit = su })
+    end
+    local menu
+    menu = Menu:new{
+        title = T(_("Holy Cart suits (%1)"), #suits),
+        item_table = items,
+        covers_fullscreen = true,
+        is_borderless = true,
+        is_popout = false,
+        onMenuSelect = function(_, item)
+            if not item.suit then return end
+            UIManager:close(menu)
+            local s = newSession()
+            s.name = "suit" .. item.suit.id:gsub("^suit%-", "")
+            s.model = Model.fromSuit(item.suit)
+            s.dirty = true
+            window.icon_session = s
+            window:refresh()
+        end,
+        onMenuHold = function(_, item)
+            if not item.suit then return true end
+            UIManager:show(InfoMessage:new{
+                text = item.suit.id .. ": " .. item.suit.name .. "\n" .. _("Formula") .. ": " .. item.suit.formula
+                    .. "\n" .. _("Parameters") .. ": " .. item.suit.params,
             })
             return true
         end,

@@ -5,3 +5,4 @@
 *.zip linguist-generated=true -diff
 *.apk linguist-generated=true -diff
 koreader-*.tar.* linguist-generated=true -diff
+plugins/icons.koplugin/holycart.lua linguist-generated=true -diff

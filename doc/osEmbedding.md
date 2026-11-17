@@ -280,6 +280,20 @@ calculations on another device of the same OS, or on the device itself when it i
   cluster picks the device (a laptop slices, the phone only views). The job and its answer go in the trace log.
 - Printing. Slice with a command-line slicer on a capable device, send the file to the printer through its network
   interface. Printer profiles (bed size, nozzle) are settings in the space.
-- Voice sessions cannot run tools, so designing by voice means the voice side records the request and the
-  tool-capable side builds it.
+- Voice: see section 20. A voice session is meant to run this itself.
 - Open choices: modelling language (OpenSCAD, CadQuery, or a Lua one of our own); which slicer; which printers.
+
+## 20. Voice sessions run tasks (declared; a requirement on the assistant side, not on this repo)
+
+Requirement from the user: a voice session must be able to run tasks when asked, make hardware changes and run
+simulations, and make the running decisions itself.
+
+- Today (observed in the voice calls of 2026-11-17): a voice call has timers, alarms, calendar, location, web
+  search, memory, past chats and docs. It has no way to run code, build files or touch hardware. Until that
+  changes, a voice call records the request word for word and the text session builds it.
+- Needed: the same tool set as the text session (shell, files, build, simulation) in voice.
+- Rule that goes with it: anything that changes hardware, deletes data or leaves the space asks for a spoken
+  confirmation first and writes the action to the trace log (`kosTrace.log`). Everything else runs without
+  asking, as the user's standing preference says.
+- Inside the OS this is the pipeline of section 15: the voice input is one more keyboard, the same runner
+  contract (section 9) executes the steps.

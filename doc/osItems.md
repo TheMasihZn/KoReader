@@ -88,7 +88,9 @@ Status: built, declared (written in `osEmbedding.md`, not built), or open.
 | 81 | 3D viewer: rotate, section, measure, outline mode for e-paper | me | declared |
 | 82 | Calculations on another device of the OS, or on this one if fast enough | you | declared |
 | 83 | Slicing and sending to a printer | me | declared |
-| 84 | Merge HolyCart suit icons into the Icons app | you | in progress |
+| 84 | Merge HolyCart suit icons into the Icons app | you | built, not tested on device |
+| 85 | Voice sessions run tasks, change hardware, run simulations; spoken confirmation for hardware | you | declared |
+| 86 | Holes and islands in icon shapes (even-odd rings) | me | built |
 
 ## Questions
 1. Transparency settings: window see-through level, or a page per app showing what it is, where it came from,

@@ -10,6 +10,8 @@ A shape: { kind = "path"|"line"|"rect"|"ellipse"|"poly", points = { {x, y}, … 
   ellipse  two opposite corners of its box
   path     a freehand line through the points
   poly     a closed shape through the points (stamps are polys)
+A poly may also carry `rings`: more closed outlines (holes or islands), filled even-odd.
+The library suits use this. Erasing and hit tests use the main outline only.
 ]]
 
 local Model = {
@@ -37,6 +39,14 @@ local function copyShapes(shapes)
         local pts = {}
         for j, p in ipairs(s.points) do pts[j] = { p[1], p[2] } end
         out[i] = { kind = s.kind, points = pts, width = s.width, fill = s.fill }
+        if s.rings then
+            out[i].rings = {}
+            for k, ring in ipairs(s.rings) do
+                local r = {}
+                for j, p in ipairs(ring) do r[j] = { p[1], p[2] } end
+                out[i].rings[k] = r
+            end
+        end
     end
     return out
 end
@@ -282,6 +292,13 @@ function Model:toSVG()
             if #p == 1 then -- a single point: draw it as a dot
                 d[#d + 1] = "L" .. num(p[1][1]) .. " " .. num(p[1][2])
             end
+            for _, ring in ipairs(s.rings or {}) do
+                for i, pt in ipairs(ring) do
+                    d[#d + 1] = (i == 1 and "M" or "L") .. num(pt[1]) .. " " .. num(pt[2])
+                end
+                d[#d + 1] = "Z"
+            end
+            if s.rings then attrs = attrs .. ' fill-rule="evenodd"' end
             out[#out + 1] = string.format('<path d="%s" %s/>\n', table.concat(d, " "), attrs)
         end
     end
@@ -295,8 +312,18 @@ function Model:toLua()
     for _, s in ipairs(self.shapes) do
         local pts = {}
         for _, p in ipairs(s.points) do pts[#pts + 1] = string.format("{%s,%s}", num(p[1]), num(p[2])) end
-        out[#out + 1] = string.format('  { kind = %q, width = %s, fill = %s, points = { %s } },\n',
-            s.kind, num(s.width or 2), s.fill and "true" or "false", table.concat(pts, ", "))
+        local rings = ""
+        if s.rings then
+            local rs = {}
+            for _, ring in ipairs(s.rings) do
+                local rp = {}
+                for _, p in ipairs(ring) do rp[#rp + 1] = string.format("{%s,%s}", num(p[1]), num(p[2])) end
+                rs[#rs + 1] = "{ " .. table.concat(rp, ", ") .. " }"
+            end
+            rings = ", rings = { " .. table.concat(rs, ", ") .. " }"
+        end
+        out[#out + 1] = string.format('  { kind = %q, width = %s, fill = %s, points = { %s }%s },\n',
+            s.kind, num(s.width or 2), s.fill and "true" or "false", table.concat(pts, ", "), rings)
     end
     out[#out + 1] = "}\n"
     return table.concat(out)
@@ -322,9 +349,37 @@ function Model.fromLua(text)
             for _, p in ipairs(s.points) do
                 shape.points[#shape.points + 1] = { tonumber(p[1]) or 0, tonumber(p[2]) or 0 }
             end
+            if type(s.rings) == "table" then
+                shape.rings = {}
+                for _, ring in ipairs(s.rings) do
+                    local r = {}
+                    for _, p in ipairs(ring) do r[#r + 1] = { tonumber(p[1]) or 0, tonumber(p[2]) or 0 } end
+                    if #r > 2 then shape.rings[#shape.rings + 1] = r end
+                end
+            end
             m.shapes[#m.shapes + 1] = shape
         end
     end
+    return m
+end
+
+--- A Holy Cart suit as an editable drawing: a filled poly on the 48 sheet, holes kept as rings.
+-- `suit` is one entry of holycart.lua (rings in a 100 x 100 sheet; rings[1] is the outline).
+function Model.fromSuit(suit)
+    local k = Model.SIZE / 100
+    local function ring(flat)
+        local r = {}
+        for i = 1, #flat - 1, 2 do r[#r + 1] = { flat[i] * k, flat[i + 1] * k } end
+        return r
+    end
+    local m = Model.new()
+    if not suit.rings or not suit.rings[1] then return m end
+    local shape = { kind = "poly", width = 0, fill = true, points = ring(suit.rings[1]) }
+    if #suit.rings > 1 then
+        shape.rings = {}
+        for i = 2, #suit.rings do shape.rings[#shape.rings + 1] = ring(suit.rings[i]) end
+    end
+    m.shapes[1] = shape
     return m
 end
 
