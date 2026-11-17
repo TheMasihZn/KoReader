@@ -84,6 +84,11 @@ Status: built, declared (written in `osEmbedding.md`, not built), or open.
 | 77 | Crash reports: "KOReader exited", top menu will not open | you | open, needs `forkPreview.log` |
 | 78 | HTTP inspector exits the app | you | open, probably native crash |
 | 79 | Publish to GitHub | you | blocked, needs a valid token |
+| 80 | Design 3D printable objects by voice through the assistant | you | declared |
+| 81 | 3D viewer: rotate, section, measure, outline mode for e-paper | me | declared |
+| 82 | Calculations on another device of the OS, or on this one if fast enough | you | declared |
+| 83 | Slicing and sending to a printer | me | declared |
+| 84 | Merge HolyCart suit icons into the Icons app | you | in progress |
 
 ## Questions
 1. Transparency settings: window see-through level, or a page per app showing what it is, where it came from,

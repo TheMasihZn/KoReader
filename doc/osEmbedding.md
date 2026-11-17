@@ -260,3 +260,26 @@ prediction). Section 14 uses Shannon until it is defined.
 One plain Markdown file holding where an unfinished discussion stands: decisions made, open questions, next step,
 and the formulas in play (LaTeX). Plain KOReader opens it without the OS; the user hands it to an agent to
 continue from that point. Not built. Suggested name: `<topic>.snapshot.md`.
+
+## 19. 3D design for printing, by voice (declared, not built)
+
+Goal from the user: design 3D-printable objects through the assistant and voice commands, explore them, and do the
+calculations on another device of the same OS, or on the device itself when it is fast enough.
+
+- Design. The user describes the object; the assistant writes a parametric model as a small script (a text file,
+  so it can be changed by voice: "make the wall 2 mm thicker") and builds a mesh (STL or 3MF, millimetres).
+  Source script and mesh are saved together; older versions follow the dotted-version plan.
+- Explore. A viewer window: rotate, zoom, cut a section, measure. On e-paper it draws outlines (few redraws, no
+  animation); on colour screens it can shade. A small software rasteriser in Lua can draw modest meshes on the
+  device; large ones go to the section 7 software GPU or to another device.
+- Calculations, each with its formula stated (rule of section 17):
+  volume $V = \tfrac16 \sum_t \mathbf{a}_t \cdot (\mathbf{b}_t \times \mathbf{c}_t)$ over the mesh triangles;
+  mass $m = \rho V$ per material; filament length and print time from the slicer; wall thickness, overhang and
+  support checks. Strength simulation (finite elements) is the heavy one.
+- Where it runs. The same rule as section 9: the shell asks for a job, the provider says what it can do, and the
+  cluster picks the device (a laptop slices, the phone only views). The job and its answer go in the trace log.
+- Printing. Slice with a command-line slicer on a capable device, send the file to the printer through its network
+  interface. Printer profiles (bed size, nozzle) are settings in the space.
+- Voice sessions cannot run tools, so designing by voice means the voice side records the request and the
+  tool-capable side builds it.
+- Open choices: modelling language (OpenSCAD, CadQuery, or a Lua one of our own); which slicer; which printers.
