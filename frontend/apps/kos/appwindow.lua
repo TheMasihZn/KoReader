@@ -87,6 +87,8 @@ function AppWindow:open(params)
     end
     local window = self:new(params)
     require("apps/kos/windows").add(window)
+    local saved = window.kos_app and AppWindow.ratioFor(window.kos_app.id)
+    if saved and not window.ratio then window.ratio = saved window:_layout() end
     UIManager:show(window)
     return window
 end
@@ -98,9 +100,25 @@ function AppWindow:init()
     self:_layout()
 end
 
+--- Saved window shape of an app: width / height as a number, or nil (fill the screen).
+function AppWindow.ratioFor(app_id)
+    if not app_id or not G_reader_settings then return nil end
+    return G_reader_settings:readSetting("kos_ratio_" .. app_id)
+end
+
 function AppWindow:_layout()
-    local width, height = Screen:getWidth(), Screen:getHeight()
-    self.dimen = Geom:new{ x = 0, y = 0, w = width, h = height }
+    local screen_w, screen_h = Screen:getWidth(), Screen:getHeight()
+    local width, height = screen_w, screen_h
+    -- Any aspect ratio: the window keeps its shape and sits centred on a quiet backdrop.
+    local ratio = self.ratio
+    if ratio and ratio > 0 then
+        if screen_w / screen_h > ratio then
+            width = math.floor(screen_h * ratio)
+        else
+            height = math.floor(screen_w / ratio)
+        end
+    end
+    self.dimen = Geom:new{ x = 0, y = 0, w = screen_w, h = screen_h }
     if self[1] then
         self[1]:free()
         self[1] = nil
@@ -130,7 +148,7 @@ function AppWindow:_layout()
         end
     end
     self.content_width, self.content_height = content_w, content_height
-    self[1] = FrameContainer:new{
+    local frame = FrameContainer:new{
         width = width,
         height = height,
         padding = 0,
@@ -143,6 +161,25 @@ function AppWindow:_layout()
             content,
         },
     }
+    if width < screen_w or height < screen_h then
+        local CenterContainer = require("ui/widget/container/centercontainer")
+        local back = Blitbuffer.Color8(0xE6)
+        pcall(function() back = require("apps/kos/flatstyle").surface_back end)
+        self[1] = FrameContainer:new{
+            width = screen_w, height = screen_h, padding = 0, margin = 0, bordersize = 0,
+            background = back,
+            CenterContainer:new{ dimen = Geom:new{ w = screen_w, h = screen_h }, frame },
+        }
+    else
+        self[1] = frame
+    end
+end
+
+--- Sets this window's shape (width / height, or nil for the whole screen) and redraws it.
+function AppWindow:setRatio(ratio)
+    self.ratio = ratio
+    self:refresh()
+    UIManager:setDirty(nil, "full")
 end
 
 --- Rebuild the content (call after changing your app's state).

@@ -9,7 +9,7 @@ a structure or common library is added. Source: `frontend/apps/kos/`, `plugins/`
 | Module | What it gives apps | Native support the OS needs |
 | --- | --- | --- |
 | `appregistry` | Home app list. An app is `app = { title, icon, order, needs, status, launch, event, action }` in a plugin's `_meta.lua`. User order (`kos_home_order`), sort modes (custom, A–Z, built-in). | A manifest format for apps and an app list service. |
-| `appwindow` | Full-screen app frame: title bar, Home/Close, resize handling, `build(window, w, h)`. Closing the last app lands on Home. | Window manager API with resize events and a "no apps open" state. |
+| `appwindow` | Full-screen app frame: title bar, Home/Close, resize handling, `build(window, w, h)`. Closing the last app lands on Home. Any aspect ratio per app (`kos_ratio_<app>`, `setRatio`). | Window manager API with resize events and a "no apps open" state. |
 | `workspace`, `windows` | Tiling split view, several windows per app, switcher. | Tiling and window-list service. |
 | `displayprofiles`, `scaling` | dp/sp sizes, DPI remembered per screen (fold/unfold). | Per-display density and a size unit that does not depend on pixels. |
 | `flatstyle` | One look: line strength, corner radius, tonal depth. Settings `kos_flat_*`. | Theme service (colour roles, line, radius) that every toolkit reads. |

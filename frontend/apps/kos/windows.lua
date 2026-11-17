@@ -142,6 +142,58 @@ function Windows.allToSplit()
     end
 end
 
+--- Window shape picker for an app (and `win` right now). Any aspect ratio.
+function Windows.shapeMenu(app_id, win)
+    local ButtonDialog = require("ui/widget/buttondialog")
+    local dialog
+    local function apply(ratio)
+        if app_id then
+            if ratio then G_reader_settings:saveSetting("kos_ratio_" .. app_id, ratio)
+            else G_reader_settings:delSetting("kos_ratio_" .. app_id) end
+            G_reader_settings:flush()
+        end
+        for _i, w in ipairs(Windows.list) do
+            if (win and w == win) or (app_id and w.kos_app and w.kos_app.id == app_id) then if w.setRatio then w:setRatio(ratio) end end
+        end
+    end
+    local function opt(text, r)
+        return { text = text, callback = function() UIManager:close(dialog) apply(r) end }
+    end
+    dialog = ButtonDialog:new{
+        title = _("Window shape"),
+        buttons = {
+            { opt(_("Fill the screen"), nil) },
+            { opt("1:1", 1), opt("4:3", 4 / 3), opt("3:2", 3 / 2) },
+            { opt("3:4", 3 / 4), opt("2:3", 2 / 3), opt("9:16", 9 / 16) },
+            { opt("16:9", 16 / 9), opt("21:9", 21 / 9), opt("32:9", 32 / 9) },
+            { { text = _("Other…"), callback = function()
+                UIManager:close(dialog)
+                local MultiInputDialog = require("ui/widget/multiinputdialog")
+                local d
+                d = MultiInputDialog:new{
+                    title = _("Window shape: width : height"),
+                    fields = {
+                        { description = _("Width"), text = "16", input_type = "number" },
+                        { description = _("Height"), text = "10", input_type = "number" },
+                    },
+                    buttons = {{
+                        { text = _("Cancel"), id = "close", callback = function() UIManager:close(d) end },
+                        { text = _("Apply"), is_enter_default = true, callback = function()
+                            local f = d:getFields()
+                            UIManager:close(d)
+                            local w, h = tonumber(f[1]), tonumber(f[2])
+                            if w and h and h > 0 and w / h >= 0.1 and w / h <= 10 then apply(w / h) end
+                        end },
+                    }},
+                }
+                UIManager:show(d)
+                d:onShowKeyboard()
+            end } },
+        },
+    }
+    UIManager:show(dialog)
+end
+
 local function windowMenu(win, after)
     local dialog
     local function act(fn) return function() UIManager:close(dialog); fn(); if after then after() end end end
@@ -151,6 +203,7 @@ local function windowMenu(win, after)
             {{ text = _("Bring to front"), callback = act(function() Windows.raise(win) end) }},
             {{ text = _("Put in split view"), enabled = not isPane(win), callback = act(function() Windows.toSplit(win) end) }},
             {{ text = _("New window of this app"), enabled = win.kos_app ~= nil, callback = act(function() Windows.newInstance(win) end) }},
+            {{ text = _("Window shape…"), callback = act(function() Windows.shapeMenu(win.kos_app and win.kos_app.id, win) end) }},
             {{ text = _("Close"), callback = act(function() win:close() end) }},
         },
     }

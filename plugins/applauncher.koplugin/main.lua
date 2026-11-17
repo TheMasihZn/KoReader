@@ -430,6 +430,12 @@ function AppLauncher:showAppMenu(app, window)
                 end },
             },
             {
+                { text = _("Window shape…"), callback = function()
+                    UIManager:close(dialog)
+                    require("apps/kos/windows").shapeMenu(app.id, nil)
+                end },
+            },
+            {
                 { text = _("Open beside"), enabled = can_split, callback = function()
                     UIManager:close(dialog)
                     self:launch(app, self.split_target or { dir = "row" })
