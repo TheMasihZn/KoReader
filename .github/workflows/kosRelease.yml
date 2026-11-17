@@ -38,7 +38,7 @@ jobs:
           gh release create "${GITHUB_REF_NAME}" \
             --title "KOReader OS ${GITHUB_REF_NAME#kosV}" \
             --notes-file dist/RELEASE.md \
-            dist/2-kosBundle.lua dist/gemmaBridge.zip dist/osEmbedding.md dist/apps/*.zip
+            dist/2-kosBundle.lua dist/gemmaBridge.zip dist/installKos.sh dist/osEmbedding.md dist/osItems.md dist/apps/*.zip
 
       - name: Keep files from a manual run
         if: github.ref_type != 'tag'

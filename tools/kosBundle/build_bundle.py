@@ -9,7 +9,7 @@ ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
 OUT = sys.argv[1] if len(sys.argv) > 1 else os.path.join(ROOT, "2-kosBundle.lua")
 
 # Add-ons shipped with the bundle (text files only; readingcomfort has fonts, so it stays in the APK).
-PLUGINS = ["applauncher", "appinstaller", "studio", "sheets", "latexview", "focus", "gemma", "updates", "icons", "logcat", "preview", "share", "pendulums", "lightlab", "viewer3d"]
+PLUGINS = ["applauncher", "appinstaller", "studio", "sheets", "latexview", "focus", "gemma", "updates", "icons", "logcat", "preview", "share", "pendulums", "lightlab", "viewer3d", "snapshot"]
 ICONS = ["kos.audio.svg", "kos.chat.svg", "kos.minimize.svg", "kos.maximize.svg", "kos.restore.svg"]
 
 files = {}

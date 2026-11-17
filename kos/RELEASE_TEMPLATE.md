@@ -4,7 +4,15 @@
 {changes}
 
 ## Install everything (recommended)
-Copy `2-kosBundle.lua` to `koreader/patches/` and restart KOReader. It contains every app and the shared
+On the laptop, in the unzipped release folder, with the phone plugged in (USB debugging on):
+
+    ./installKos.sh all
+
+That puts `2-kosBundle.lua` into `koreader/patches/` on the phone, removes the old hyphenated files, then
+starts the laptop bridge. Close KOReader completely and open it again.
+
+Without adb: copy `2-kosBundle.lua` to `koreader/patches/` on the phone by hand, delete
+`2-0-kos-bundle.lua` and `2-fork-preview.lua` there, restart KOReader. It contains every app and the shared
 libraries they need.
 
 ## Install one app
@@ -20,7 +28,7 @@ install it. Install the bundle first, the apps need its shared libraries.
 Needs Ollama running; `espeak-ng` for read-aloud. Shared folder: `~/kosShare`.
 
 ## For the OS
-`osEmbedding.md` lists every common library and what the OS must provide natively.
+`osEmbedding.md` lists every common library and what the OS must provide natively; `osItems.md` is the ledger of every item and its status.
 
 ## Checksums
 {checksums}

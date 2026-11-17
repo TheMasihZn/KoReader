@@ -6,7 +6,7 @@
 Reads kos/VERSION, kos/CHANGELOG.md and kos/RELEASE_TEMPLATE.md. Writes dist/ (bundle, apps/*.zip,
 gemmaBridge.zip, osEmbedding.md, RELEASE.md). With --check-tag, fails unless TAG is `kosV<VERSION>`.
 """
-import datetime, hashlib, os, re, subprocess, sys, zipfile
+import datetime, hashlib, os, re, shutil, subprocess, sys, zipfile
 
 ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
 DIST = os.path.join(ROOT, "dist")
@@ -27,6 +27,7 @@ APPS = [  # id, label, needs
     ("pendulums", "Pendulums", "bundle"),
     ("lightlab", "Light lab (double slit)", "bundle"),
     ("viewer3d", "3D viewer (STL, design scripts)", "bundle"),
+    ("snapshot", "Snapshots (save where a discussion stands)", "bundle"),
 ]
 
 def read(rel):
@@ -74,12 +75,16 @@ def main():
     zip_dir(os.path.join(ROOT, "tools/gemmaBridge"), os.path.join(DIST, "gemmaBridge.zip"), "gemmaBridge")
     with open(os.path.join(DIST, "osEmbedding.md"), "w", encoding="utf-8") as f:
         f.write(read("doc/osEmbedding.md"))
+    with open(os.path.join(DIST, "osItems.md"), "w", encoding="utf-8") as f:
+        f.write(read("doc/osItems.md"))
+    shutil.copy(os.path.join(ROOT, "kos/installKos.sh"), os.path.join(DIST, "installKos.sh"))
+    os.chmod(os.path.join(DIST, "installKos.sh"), 0o755)
 
     try:
         commit = subprocess.check_output(["git", "rev-parse", "--short", "HEAD"], cwd=ROOT, text=True).strip()
     except Exception:
         commit = "unknown"
-    files = ["2-kosBundle.lua", "gemmaBridge.zip", "osEmbedding.md"] + ["apps/%s.zip" % a for a, _, _ in APPS]
+    files = ["2-kosBundle.lua", "gemmaBridge.zip", "installKos.sh", "osEmbedding.md", "osItems.md"] + ["apps/%s.zip" % a for a, _, _ in APPS]
     checksums = "\n".join("`%s`  %s" % (sha(os.path.join(DIST, p))[:16], p) for p in files)
     apps = "\n".join("| %s | %s.zip | %s |" % (label, app, needs) for app, label, needs in APPS)
     notes = read("kos/RELEASE_TEMPLATE.md").format(
