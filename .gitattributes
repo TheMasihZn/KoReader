@@ -1,0 +1,7 @@
+# Files that are built, not written by hand. GitHub collapses them in diffs and
+# leaves them out of language statistics.
+2-0-kos-bundle.lua linguist-generated=true -diff
+2-fork-preview.lua linguist-generated=true -diff
+*.zip linguist-generated=true -diff
+*.apk linguist-generated=true -diff
+koreader-*.tar.* linguist-generated=true -diff
