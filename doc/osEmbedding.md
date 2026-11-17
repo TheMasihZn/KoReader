@@ -304,3 +304,10 @@ Settings order by Shannon entropy as a stand-in for Framal Entropy: $H = -\sum_i
 values, $H = \log_2 n$ when nothing is observed. Canvas keeps items on an unbounded plane (`canvasmodel.lua`).
 Open in IDE builds an `am start -a android.intent.action.VIEW` command (`idehandoff.lua`). Bridge clients are
 registered and approved by the owner (`tools/gemmaBridge/registry.py`).
+
+## 22. Debugger session and ADB (built in part, 0.4.0)
+Built: `debugsession.lua` (breakpoints with conditions, stepping through a handler, post-mortem snapshots with
+locals, call counts, timing spans, session log file), `adb.lua` (an `adb` program wrapper: devices, connect, shell,
+logcat, install, push, pull). Breakpoints in the UI thread record and continue; they cannot wait for a person.
+Declared, not built: an ADB daemon (`adbd`) inside the OS image, a debugger front end on the laptop that sets
+breakpoints and steps through the bridge, a layout inspector like Android Studio's. These need the OS layer.
