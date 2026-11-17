@@ -82,3 +82,43 @@ Existing parts to build on instead of starting from zero:
 What the shell needs from the OS: a way to ask "which GPUs are there" that also lists this one, and the
 same device node and socket names as a real GPU. Open choice for the OS chat: build on Mesa and SwiftShader
 (fast to get working) or write a new driver (full control, much more work).
+
+## 7. Emulation drivers for any device (OS layer)
+
+Goal: any device a program can ask for can be provided by software, so an app or another machine
+cannot tell the difference except by speed. The GPU driver in section 6 is the first case of this.
+
+**Accommodations the OS needs (design these first, once, for every device class):**
+
+1. **Device registry.** One list of every device, real or emulated: class, name, capabilities, who provides it
+   (hardware, software, another device in the space, a recording). The shell's Devices view and the `common`
+   library's `needs` check read this list.
+2. **Same face.** An emulated device uses the same device node, socket or port names, the same calls and the
+   same error behaviour as a real one. Only speed (and, honestly reported, limits) may differ.
+3. **Backends per device.** Each class can be backed by: software compute, another device in the space (the
+   phone camera acting as a laptop webcam), a file or recording, or a generator. The user chooses.
+4. **Capability descriptor.** Every device says what it really supports (formats, rates, sizes), so programs
+   adapt instead of failing.
+5. **Trace.** Every emulated device logs its calls in the same trace format as `inputlayer` (`kos-trace.log`
+   style), so what an emulated device did is always visible.
+6. **Honesty switch.** A setting for how an emulated device reports itself: as the real model it imitates, or
+   as "software". Default: say what it is.
+
+**Building blocks that already exist (use before writing new drivers):**
+
+| Device class | Software or virtual way to provide it |
+| --- | --- |
+| GPU, display | Mesa llvmpipe, lavapipe, SwiftShader; vkms or virtio-gpu for the kernel side |
+| NPU, neural | ONNX Runtime, XNNPACK on CPU |
+| Camera | v4l2loopback (a virtual webcam fed by any source) |
+| Microphone, speaker | snd-aloop, PipeWire or PulseAudio virtual devices |
+| Keyboard, mouse, touch | uinput (also what the local model uses through `inputlayer`) |
+| Storage | loop devices, null_blk, FUSE file systems |
+| Network | tun/tap, veth, network namespaces |
+| Bluetooth | vhci (virtual controller) |
+| Sensors (accelerometer, light, …) | IIO dummy devices or a sensor shim fed by a generator |
+| Location | a mock location source |
+| Serial, USB | usbip, gadget framework, pty pairs |
+
+Open choice for the OS chat: a single "virtual device" daemon that owns the registry and loads one plugin
+per class, or one small driver per class that registers itself. The first is easier to keep consistent.
