@@ -134,3 +134,24 @@ the consciousness work (a model trained on inputs the user picked, with a contin
 - Why own corpus: an existing model cannot be split back into its training pages; only the inputs can be chosen.
 - Not decided: which archives are still available, their sizes, and the model to train. Next step is a search for
   these, then a size and licence list.
+
+## 9. Internal runner in Kotlin (declared, not built)
+
+Goal from the user: a modern internal runner, an embeddable engine written in Kotlin, able to run command-line
+apps inside the shell. If it cannot live in this repo, it gets its own repository; for now it is only listed.
+
+Why it cannot be built here: KOReader runs on LuaJIT. There is no JVM inside it, and Kotlin needs a JVM
+or a native build. On Android the app is a native shell, so a JVM is not available to the Lua side either.
+
+Options for the OS chat (pick one):
+1. Separate process. A Kotlin/Native binary (no JVM) that the shell starts and talks to over a local
+   socket or stdin and stdout. Runs CLI apps, returns output to a shell window. Smallest change.
+2. Embedded JVM. A light JVM bundled next to the shell and started on demand. Heavier; fits the user's earlier
+   "app with a light JDK" idea.
+3. New repository, `kosRunner`, holding the Kotlin engine on its own, with this repo only calling it.
+
+What exists today for CLI apps: Lua can start any program with `io.popen`, and Studio shows its output. The
+runner would add what that lacks: working directory per app, environment, input, stop and timeout, and the
+same trace format as `inputlayer` (`kosTrace.log`).
+
+Decision needed: option 1, 2 or 3. Nothing is built for it yet.
