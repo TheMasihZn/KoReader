@@ -332,3 +332,13 @@ Your design, the usual way, and the weak points:
 4. Embedded link in plain bytes with a CRC, no encryption. A device on the same wire can read and write. Fine on a bench, not on an
    open network; add a key-based signature before it leaves the desk.
 5. HTTP on the phone listens on 127.0.0.1 only, token in a header. Opening it to the network needs TLS and per-client tokens first.
+
+## 24. Folder per file, John Doe, themes, entropy applet: departures
+- Folder per file (`folderfile.lua`). Usual: flat folders, metadata in extended attributes or a database. Yours: every file gets a
+  folder and a text note. Weak points: more directory entries and longer paths, tools that expect flat folders break, thousands of
+  files mean thousands of folders. Gain: every file explains itself; the note is human and machine readable. Several files with the
+  same base name share one folder. Reversible: Unwrap puts the file back and keeps the note.
+- John Doe (`johndoe.lua`). Usual: name the project first. Yours: generated placeholder, rename later. Weak point: placeholders that
+  never get renamed pile up; the rename rewrites the name inside `_meta.lua` and `main.lua` only.
+- Themes (`theme.lua`). Per-app override over one default, as you asked. Weak point: many overrides make the system look uneven; `Back to default` clears one key.
+- Entropy (`entropycalc.lua`): Shannon stand-in, labelled as such everywhere. The sum over independent axes is an assumption, not your definition.

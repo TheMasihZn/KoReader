@@ -193,6 +193,21 @@ function Studio:projectListItems()
             callback = function() self:showLogMenu() end,
         },
         {
+            text = _("+ New app, no name yet"),
+            callback = function()
+                local J = require("apps/kos/johndoe")
+                local lfs = require("libs/libkoreader-lfs")
+                local fs = {
+                    exists = function(p) return lfs.attributes(p, "mode") ~= nil end,
+                    mkdir = function(p) return lfs.mkdir(p) end,
+                    write = function(p, t) local f = io.open(p, "w"); if not f then return false end f:write(t); f:close(); return true end,
+                }
+                local ok, res = J.create(pluginsDir(), J.newName(), fs)
+                UIManager:show(InfoMessage:new{ text = ok and (_("Created ") .. res) or tostring(res), timeout = 4 })
+                self:refresh()
+            end,
+        },
+        {
             text = _("REST routes"),
             callback = function() require("apps/kos/routesview").show() end,
             separator = true,

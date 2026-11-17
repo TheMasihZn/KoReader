@@ -7,3 +7,4 @@ One line per step: when, commit, what, branch. Written by tools/kosBundle/journa
 - 2026-11-17T09:45Z `034819a` simulation harness: 21 bundled plugins load and open headless (branch kosNine)
 - 2026-11-17T09:47Z `16d56ea` REST router, Telegram bot, HTTP adapter, routes view in Studio, REST plugin (branch kosNine)
 - 2026-11-17T09:49Z `5fdb98c` adapter chains, kosLink protocol (Lua + C), sandbox policy, doc section 23 (branch kosNine)
+- 2026-11-17T09:51Z `b1dce01` entropy calc, folder per file, John Doe, themes, plugins entropy/themes/folderfile, Studio unnamed app (branch kosNine)

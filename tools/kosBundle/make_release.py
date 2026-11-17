@@ -34,6 +34,9 @@ APPS = [  # id, label, needs
     ("canvas", "Canvas (endless page)", "bundle"),
     ("debugger", "Debugger (session, breakpoints, ADB)", "bundle"),
     ("restbot", "REST and bot (Telegram and HTTP to REST calls)", "bundle"),
+    ("entropy", "Entropy (LaTeX applet)", "bundle"),
+    ("themes", "Themes (default and per app)", "bundle"),
+    ("folderfile", "Folder per file", "bundle"),
 ]
 
 def read(rel):
