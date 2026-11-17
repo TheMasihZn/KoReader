@@ -8,3 +8,4 @@ One line per step: when, commit, what, branch. Written by tools/kosBundle/journa
 - 2026-11-17T09:47Z `16d56ea` REST router, Telegram bot, HTTP adapter, routes view in Studio, REST plugin (branch kosNine)
 - 2026-11-17T09:49Z `5fdb98c` adapter chains, kosLink protocol (Lua + C), sandbox policy, doc section 23 (branch kosNine)
 - 2026-11-17T09:51Z `b1dce01` entropy calc, folder per file, John Doe, themes, plugins entropy/themes/folderfile, Studio unnamed app (branch kosNine)
+- 2026-11-17T09:51Z `832b066` capability directory generator and MCP server (tools/gemmaBridge/mcp_capabilities.py) (branch kosNine)

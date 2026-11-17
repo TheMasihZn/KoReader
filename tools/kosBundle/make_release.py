@@ -93,7 +93,8 @@ def main():
         commit = subprocess.check_output(["git", "rev-parse", "--short", "HEAD"], cwd=ROOT, text=True).strip()
     except Exception:
         commit = "unknown"
-    files = ["2-kosBundle.lua", "gemmaBridge.zip", "installKos.sh", "osEmbedding.md", "osItems.md"] + ["apps/%s.zip" % a for a, _, _ in APPS]
+    subprocess.check_call([sys.executable, os.path.join(ROOT, "tools/kosBundle/make_capabilities.py"), DIST])
+    files = ["2-kosBundle.lua", "capabilities.json", "capabilities.md", "gemmaBridge.zip", "installKos.sh", "osEmbedding.md", "osItems.md"] + ["apps/%s.zip" % a for a, _, _ in APPS]
     checksums = "\n".join("`%s`  %s" % (sha(os.path.join(DIST, p))[:16], p) for p in files)
     apps = "\n".join("| %s | %s.zip | %s |" % (label, app, needs) for app, label, needs in APPS)
     notes = read("kos/RELEASE_TEMPLATE.md").format(

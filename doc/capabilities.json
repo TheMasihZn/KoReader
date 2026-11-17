@@ -1,0 +1,958 @@
+{
+ "version": "0.4.0",
+ "modules": [
+  {
+   "name": "apps/kos/adapters",
+   "file": "frontend/apps/kos/adapters.lua",
+   "about": "Virtual adapters. An adapter chain takes values (a number from a sensor, a key, a voice level) through steps that can disturb them on purpose, and ends in a place: another chain, a function, or a real device over the kosLink protocol. local a = Adapters.chain{ name = \"knobToEsp\", seed = 7, nodes = { {type=\"gain\", k=2}, {type=\"noise\", amp=0.1}, {type=\"clip\", lo=0, hi=10} } } a:to(Adapters.device{ link = transport, channel = 3 }) -- transport = { write = function(bytes) end } a:push(4.2) -- 8.4 plus noise, clipped, sent as a DATA frame b:from(a) -- chains can feed chains Steps (perturbations): g",
+   "functions": [
+    "chain",
+    "device",
+    "from",
+    "get",
+    "names",
+    "push",
+    "reset",
+    "to"
+   ]
+  },
+  {
+   "name": "apps/kos/adb",
+   "file": "frontend/apps/kos/adb.lua",
+   "about": "ADB from inside the shell. Needs an `adb` program on the device (path in setting kos_adb_path, default \"adb\"), or runs on the laptop. This module builds the commands, runs them, and reads the answers; it is not an ADB server. An ADB daemon inside the OS image (adbd in the kernel's userspace) is an OS-layer item, see osEmbedding.md. ADB.devices() -> { { serial=, state=, info= } ... } ADB.connect(\"192.168.1.20:5555\") -> ok, message (wireless debugging) ADB.shell(\"getprop ro.build.version.release\", serial) ADB.logcat(serial, \"*:W\", 200) -> lines, newest last ADB.install(apk, serial) / ADB.push(a,",
+   "functions": [
+    "command",
+    "connect",
+    "devices",
+    "install",
+    "logcat",
+    "parseDevices",
+    "pull",
+    "push",
+    "run",
+    "shell"
+   ]
+  },
+  {
+   "name": "apps/kos/appregistry",
+   "file": "frontend/apps/kos/appregistry.lua",
+   "about": "Finds the apps shown on the KOReader OS home screen. An app is either built in (a Dispatcher action) or an ordinary plugin that declares an `app` table, in its `main.lua` or its `_meta.lua`: app = { title = _(\"Hello\"), -- default: the plugin's fullname from _meta.lua icon = \"appbar.typeset\", -- a KOReader icon name, or a file in your plugin folder (\"icon.svg\") description = _(\"…\"), -- default: the plugin's description from _meta.lua order = 50, -- optional: lower comes first (built-ins use 1-20) } and how to start it, the first that exists wins: function MyPlugin:launchApp() … end -- usually o",
+   "functions": [
+    "arrange",
+    "canSplit",
+    "getApps",
+    "launch",
+    "move",
+    "moveApp",
+    "sortMode",
+    "userOrder"
+   ]
+  },
+  {
+   "name": "apps/kos/appwindow",
+   "file": "frontend/apps/kos/appwindow.lua",
+   "about": "A full-screen window for KOReader OS apps. It gives every app the same frame: a title bar with Home and Close buttons, the Back key closes it, and it rebuilds itself when the screen size changes (rotation, split-screen, freeform windows, unfolding a foldable). You only provide a `build` function that returns your content for a given size. It is called again on every resize, so never cache sizes yourself. @usage local AppWindow = require(\"apps/kos/appwindow\") local TextWidget = require(\"ui/widget/textwidget\") local Font = require(\"ui/font\") AppWindow:open{ title = \"Hello\", build = function(wind",
+   "functions": [
+    "_layout",
+    "close",
+    "goHome",
+    "handleEvent",
+    "init",
+    "onClose",
+    "onCloseWidget",
+    "onScreenResize",
+    "open",
+    "ratioFor",
+    "refresh",
+    "setRatio",
+    "setTitle",
+    "toggleMaximize"
+   ]
+  },
+  {
+   "name": "apps/kos/audiopipeline",
+   "file": "frontend/apps/kos/audiopipeline.lua",
+   "about": "One audio pipeline for every app (Gemma, messengers, …): play, repeat, history. Any app hands it a clip, which is just something with a URL: local Audio = require(\"apps/kos/audiopipeline\") Audio.play{ url = \"http://…/reply-12.wav\", title = \"Gemma: reply 12\", source = \"gemma\" } Audio.repeatLast() -- play the last clip again (from the cache) Audio.recent() -- newest first, kept across restarts Where the audio comes out: playback is handed to Android's media player, so it goes wherever Android sends sound, which is the Bluetooth headset or earbuds when one is connected, otherwise the phone speake",
+   "functions": [
+    "play",
+    "recent",
+    "repeatLast",
+    "showRecent"
+   ]
+  },
+  {
+   "name": "apps/kos/bridgeid",
+   "file": "frontend/apps/kos/bridgeid.lua",
+   "about": "The name this phone gives itself to the laptop bridge. The bridge's registry lists clients by this id and asks you to approve a new one. It is made once (device model plus 4 random characters) and kept. BridgeId.get() -> \"SM-F946B-3fa1\" BridgeId.headers(pin) -> { [\"X-Bridge-Pin\"] = pin, [\"X-Bridge-Client\"] = id } BridgeId.explain(code, body) -> text for a 401 or 403 answer, nil for other codes",
+   "functions": [
+    "explain",
+    "get",
+    "headers"
+   ]
+  },
+  {
+   "name": "apps/kos/canvasmodel",
+   "file": "frontend/apps/kos/canvasmodel.lua",
+   "about": "Endless page model: items placed anywhere on an unbounded plane, a viewport that pans over it. No drawing here, so it can be tested without a screen. local c = Canvas.new({ w = 1000, h = 1800 }) c:add{ x = 0, y = 0, text = \"hello\" } -- or app = \"pendulums\" c:pan(dx, dy) -- finger moved by dx, dy: the page moves with it c:visible() -- items touching the viewport, with screen positions c:toData() / Canvas.fromData(t, viewport) -- kept in the setting kos_canvas c:fitAll() -- viewport that shows every item Depth (z) is stored per item for later; layers are not drawn yet.",
+   "functions": [
+    "add",
+    "bounds",
+    "drag",
+    "fitAll",
+    "fromData",
+    "hit",
+    "moveTo",
+    "new",
+    "pan",
+    "remove",
+    "toData",
+    "visible"
+   ]
+  },
+  {
+   "name": "apps/kos/common",
+   "file": "frontend/apps/kos/common.lua",
+   "about": "Common library for KOReader OS apps (the Lua layer every app can use). Rule for this file: nothing is added without the owner's say-so. Ask first. What is in it now (asked for): * Needs and \"under development\" notices. An app can say what it needs, and the OS tells the user when it is missing instead of failing: app = { title = _(\"Gemma\"), needs = { { name = _(\"A laptop running the Gemma bridge\"), ok = function() return bridgeIsSet() end }, }, status = \"development\", -- optional: the whole app is still being built } `ok` returns true when the thing is there. A need without `ok` counts as missi",
+   "functions": [
+    "notice",
+    "noticeText",
+    "unmet"
+   ]
+  },
+  {
+   "name": "apps/kos/debugger",
+   "file": "frontend/apps/kos/debugger.lua",
+   "about": "Debugger for KOReader OS apps. 1. Trail. Before an app starts, \"launching <app>\" is written to koreader/kosDebug.log; when it starts fine, \"started\"; when it raises an error, \"error: ...\". The note is cleared a few seconds after a good start. If KOReader dies while an app starts (a native crash no Lua code can catch), the note is still there at the next start: you are told which app did it, and it can be switched off until you re-enable it. 2. Layout bounds. Like Android's \"Show layout bounds\": a thin box around every container widget, colour by kind. Setting kos_layout_bounds; flip it from Ho",
+   "functions": [
+    "boundsOn",
+    "checkLastStart",
+    "disabledApps",
+    "failed",
+    "isDisabled",
+    "launching",
+    "log",
+    "restore",
+    "setBounds",
+    "setDisabled",
+    "started"
+   ]
+  },
+  {
+   "name": "apps/kos/debugsession",
+   "file": "frontend/apps/kos/debugsession.lua",
+   "about": "Debug session: breakpoints, stepping, inspection, post-mortem snapshots, call profile, session log. Built on Lua's debug library (LuaJIT has it), so it needs nothing outside the app. local S = require(\"apps/kos/debugsession\") S.start{ logfile = \"/sdcard/koreader/kosDebug.log\" } S.addBreakpoint(\"wintitlebar.lua\", 120) -- file name ending, line S.addBreakpoint(\"usearch.lua\", 98, \"#words > 1\") -- with a condition (Lua expression over locals) S.run(function() ... end) -- code under the session S.protect(fn, ...) -- on error: stack and locals at the failing line are kept S.snapshots() -- list of { ",
+   "functions": [
+    "_onError",
+    "active",
+    "addBreakpoint",
+    "breakpoints",
+    "inspect",
+    "log",
+    "profile",
+    "protect",
+    "removeBreakpoint",
+    "report",
+    "run",
+    "snapshots",
+    "span",
+    "spanEnd",
+    "start",
+    "stop"
+   ]
+  },
+  {
+   "name": "apps/kos/displayprofiles",
+   "file": "frontend/apps/kos/displayprofiles.lua",
+   "about": "A DPI for each screen, for foldables (Galaxy Fold: cover screen vs unfolded). Always on: the DPI you set (Screen DPI menu) is remembered for the screen you're using, and applied automatically when the device switches screens (folding / unfolding). A screen you never set a DPI for uses Auto. Changes apply live, without a restart. A screen is recognised by the shorter side of the physical display, which doesn't change with rotation, notches or split-screen.",
+   "functions": [
+    "applyDPI",
+    "get",
+    "key",
+    "label",
+    "onDisplayChanged",
+    "refreshSizes",
+    "relayout",
+    "set",
+    "setForCurrentScreen",
+    "startupDPI"
+   ]
+  },
+  {
+   "name": "apps/kos/entropycalc",
+   "file": "frontend/apps/kos/entropycalc.lua",
+   "about": "Entropy calculator with LaTeX output. STAND-IN: this is Shannon entropy. Your Framal Entropy (events, positions, frames) has no definition yet; until it has one, the \"frame\" function below is the independent-axes version and every output says so. E.shannon(weights) -> bits H = -sum p_i log2 p_i, weights need not add up to 1 E.bounds(n) -> 0, log2(n) lowest and highest H for n outcomes E.frame{ events = {..}, positions = {..}, frames = {..} } -> H, max, parts H = H_events + H_positions + H_frames (axes independent), max = log2(E P F) E.latex(result) -> LaTeX text for the formula with the number",
+   "functions": [
+    "bounds",
+    "bytes",
+    "frame",
+    "latex",
+    "shannon"
+   ]
+  },
+  {
+   "name": "apps/kos/filehandlers",
+   "file": "frontend/apps/kos/filehandlers.lua",
+   "about": "KOReader OS \"Open with\": apps claim file types. local FileHandlers = require(\"apps/kos/filehandlers\") FileHandlers:register{ id = \"sheets\", -- unique title = _(\"Sheets\"), -- shown in \"Open with\" extensions = { \"csv\", \"tsv\", \"xlsx\" }, open = function(file) … end, -- usually opens an AppWindow } Registering a type: * makes those files visible in the file browser (even if no reader supports them), * opens them with the app when tapped (if several apps claim a type, you choose), * adds \"Open with…\" to the long-press menu of those files. Register from your plugin's init() (not at the top of main.lu",
+   "functions": [
+    "addFileDialogButton",
+    "forFile",
+    "open",
+    "openWith",
+    "register",
+    "unregister"
+   ]
+  },
+  {
+   "name": "apps/kos/flatstyle",
+   "file": "frontend/apps/kos/flatstyle.lua",
+   "about": "Flat, Material-style look for KOReader OS: calm \"paper\" tones, soft lines, nothing that shouts. Meant for e-paper-like reading and developer tools. * Depth comes from tone, not from heavy lines: the window in front is the lightest, windows behind it are slightly darker. * Outlines (around dialogs, windows) are soft grey instead of black. * Title bars end in a fine light line, lists are separated by faint lines, dialog corners are a little rounder. On by default; switch off in Home screen → \"Flat design\". Turn it off on black-and-white e-ink screens, where grey outlines are hard to see.",
+   "functions": [
+    "applyLevel",
+    "enabled",
+    "install",
+    "lines",
+    "radius"
+   ]
+  },
+  {
+   "name": "apps/kos/folderfile",
+   "file": "frontend/apps/kos/folderfile.lua",
+   "about": "Folder per file. `/a/something.jpg` becomes `/a/something/something.jpg` with a plain text note beside it, `/a/something/something.jpg.md`: what the file is, where it came from, and the entropy of its bytes in LaTeX. Several files with the same base name (a.jpg, a.png) share one folder `a`. FolderFile.plan(path) -> { folder, file, meta } nothing is touched FolderFile.wrap(path, fs) -> ok, planOrError moves the file, writes the note; refuses to overwrite FolderFile.unwrap(path, fs) -> ok puts the file back; the note and folder stay (nothing is lost) `fs` is { exists, mkdir, rename, read, write,",
+   "functions": [
+    "note",
+    "plan",
+    "unwrap",
+    "wrap"
+   ]
+  },
+  {
+   "name": "apps/kos/gestureforward",
+   "file": "frontend/apps/kos/gestureforward.lua",
+   "about": "Lets your Gestures (Settings › Taps and gestures) work while a KOReader OS app window is open. App windows cover the screen, so touches used to stop at them and never reached the gesture zones of the file browser or reader underneath: a corner long-press set to open a plugin did nothing while Studio was open. * Long-press, multi-swipe and two-finger gestures that you assigned an action to are handled first, like system gestures. * Taps and swipes go to the app first; if the app doesn't use them, they're passed on. * Only gestures with an assigned action are forwarded, so a tap in an app never ",
+   "functions": [
+    "forward",
+    "handle",
+    "isPriority"
+   ]
+  },
+  {
+   "name": "apps/kos/home",
+   "file": "frontend/apps/kos/home.lua",
+   "about": "Home folder lookup that works on every KOReader build. Older builds have no filemanagerutil.getHomeFolder(), so never call it blindly.",
+   "functions": [
+    "get"
+   ]
+  },
+  {
+   "name": "apps/kos/httpadapter",
+   "file": "frontend/apps/kos/httpadapter.lua",
+   "about": "Plain HTTP in and out for the REST router: turns the text of one request into a router request, and the router's answer into the text of a response. The socket loop lives in the plugin; this part has no I/O so it can be tested. local req, err_status = Http.parse(raw, tokens) -- tokens = { [secret] = clientId } local text = Http.response(status, tbl, json) A request needs the header X-Rest-Token. Unknown token: 401. A body is read up to Content-Length (max 8 KB).",
+   "functions": [
+    "parse",
+    "response"
+   ]
+  },
+  {
+   "name": "apps/kos/idehandoff",
+   "file": "frontend/apps/kos/idehandoff.lua",
+   "about": "Open a file in an IDE (IntelliJ, Android Studio, or any app the user names) with an Android intent. IdeHandoff.command(path, package) -> the shell command that asks Android to open the file in that app IdeHandoff.open(path, package) -> runs it, returns ok, message IdeHandoff.supported(path) -> true for source and text files an IDE can edit The package is chosen by the user in the setting kos_ide_package (for example the package name of the IDE as shown by `pm list packages`). Without one, Android's own chooser appears. The path is quoted for the shell. Only the file named by the user is handed",
+   "functions": [
+    "command",
+    "mime",
+    "open",
+    "supported"
+   ]
+  },
+  {
+   "name": "apps/kos/inputlayer",
+   "file": "frontend/apps/kos/inputlayer.lua",
+   "about": "Input layer: the one door the OS's local model (or any script) uses to act like a user. It sends taps, swipes and typed text through KOReader's normal event path, the same one your finger uses, so nothing happens that you could not do by hand. Every action is drawn on a small overlay (a ring where it lands) and appended to `koreader/kosTrace.log` as one line: time, who, action, details, result. local IL = require(\"apps/kos/inputlayer\") IL.tap(300, 500, \"gemma\") IL.swipe(100, 800, 100, 300, \"gemma\") IL.type(\"hello\", \"gemma\") `who` is just a label for the log. Set IL.enabled = false to stop all ",
+   "functions": [
+    "format",
+    "hold",
+    "key",
+    "keyNames",
+    "listen",
+    "swipe",
+    "tap",
+    "type"
+   ]
+  },
+  {
+   "name": "apps/kos/johndoe",
+   "file": "frontend/apps/kos/johndoe.lua",
+   "about": "John Doe: the unnamed starter app. A new project starts with a generated placeholder name and the default look; you name it later, once you know what it is. JohnDoe.newName(seed) -> \"johnDoeAmberFjord\" (camelCase, no hyphens) JohnDoe.files(name) -> { [\"_meta.lua\"] = text, [\"main.lua\"] = text } JohnDoe.create(pluginsDir, name, fs) -> ok, folder or error (refuses to overwrite) JohnDoe.rename(pluginsDir, old, new, fs) The template uses the theme layer (apps/kos/theme.lua): the default theme unless the app sets its own.",
+   "functions": [
+    "create",
+    "files",
+    "launchApp",
+    "newName",
+    "rename"
+   ]
+  },
+  {
+   "name": "apps/kos/keyboardtoolbar",
+   "file": "frontend/apps/kos/keyboardtoolbar.lua",
+   "about": "The row of quick buttons that sits on top of the keyboard, Samsung-keyboard style: Paste, then the audio buttons (Play, Repeat, Recent), then whatever the current app adds. Today it goes into an InputDialog's button rows (those sit right above KOReader's keyboard). When KOReader OS gets its own keyboard, the keyboard shows this same row, so apps don't change. local KeyboardToolbar = require(\"apps/kos/keyboardtoolbar\") -- an app's own buttons, shown while that app's input is open: local row = KeyboardToolbar.row{ input = dialog, -- where Paste goes audio = { play = function() … end }, -- what \"",
+   "functions": [
+    "register",
+    "row",
+    "unregister"
+   ]
+  },
+  {
+   "name": "apps/kos/latexart",
+   "file": "frontend/apps/kos/latexart.lua",
+   "about": "LaTeX art: pictures drawn from a scene, not from characters. A scene is a list of shapes in world units (x to the right, y up). The same scene gives: * LatexArt.tikz(scene) real LaTeX (TikZ) source you can paste into a .tex file * LatexArt.paint(scene, bb, ...) pixels on a blitbuffer (the \"virtual display\") * LatexArt.unicode(tex) a LaTeX formula as readable text (alpha, ², √, ½ ...) local S = LatexArt.scene{ xmin = -1, xmax = 1, ymin = -1, ymax = 1 } S:line(0, 0, 1, 0.5, { width = 2 }) S:circle(0, 0, 0.2, { fill = true }) S:dot(0.5, 0.5) S:text(0, 0.9, \"$E = mc^2$\") -- text is kept as LaTeX p",
+   "functions": [
+    "circle",
+    "dot",
+    "line",
+    "paint",
+    "path",
+    "rect",
+    "scene",
+    "text",
+    "tikz",
+    "toPixel",
+    "unicode"
+   ]
+  },
+  {
+   "name": "apps/kos/linkproto",
+   "file": "frontend/apps/kos/linkproto.lua",
+   "about": "kosLink frame protocol, the Lua side. The same bytes are produced and read by embedded/kosLink/kosLink.c (ESP32, ATmega, anything with a C compiler). Frames are plain bytes, so any wire carries them: serial, TCP, Bluetooth. 0x7E | ver | type | seq | len | payload (0..64) | crc hi | crc lo CRC is CRC-16/CCITT-FALSE (poly 0x1021, start 0xFFFF) over ver, type, seq, len and the payload. Inside a frame, bytes 0x7E and 0x7D are sent as 0x7D followed by the byte XOR 0x20. Types: 1 hello (text name) 2 data (channel, int32 little endian, thousandths) 3 command (text) 4 ack (seq of the frame acknowledge",
+   "functions": [
+    "crc16",
+    "dataPayload",
+    "encode",
+    "parser",
+    "readData"
+   ]
+  },
+  {
+   "name": "apps/kos/mesh",
+   "file": "frontend/apps/kos/mesh.lua",
+   "about": "Triangle meshes for 3D printing: read and write STL, measure, check, and build simple shapes from a script. No screen code, so it is tested on its own. A mesh is a list of triangles; a triangle is { {x,y,z}, {x,y,z}, {x,y,z} }, in millimetres. Measures (each is the formula the OS notes name for it): volume V = (1/6) * sum over triangles of a . (b x c) (signed tetrahedra from the origin) area A = (1/2) * sum over triangles of |(b - a) x (c - a)| mass m = rho * V, with rho in g/cm3 and V in mm3 / 1000 overhang area of faces that face down steeper than the limit (default 45 degrees from vertical)",
+   "functions": [
+    "area",
+    "bounds",
+    "box",
+    "cylinder",
+    "edges",
+    "join",
+    "mass",
+    "move",
+    "overhang",
+    "parseSTL",
+    "projector",
+    "report",
+    "rotation",
+    "runScript",
+    "toSTL",
+    "volume"
+   ]
+  },
+  {
+   "name": "apps/kos/overrides",
+   "file": "frontend/apps/kos/overrides.lua",
+   "about": "Replacement files for KOReader's own apps (not add-ons). A replacement is a Lua file that is used *instead of* a built-in one of the same module name, for example koreader/overrides/files/apps/kos/appwindow.lua replaces frontend/apps/kos/appwindow.lua The built-in files are never touched: switch a replacement off (or delete it) and the built-in one is back after a restart. * Loaded at the very start (reader.lua calls `install()`), so everything that is required afterwards uses the replacement. Add-ons (plugins) are not affected: they live in koreader/plugins. * Each replacement can be switched",
+   "functions": [
+    "builtinModules",
+    "builtinPath",
+    "copyBuiltin",
+    "dir",
+    "filesDir",
+    "hasOld",
+    "hookPlugins",
+    "inspectZip",
+    "install",
+    "installZip",
+    "list",
+    "markStarted",
+    "pathOf",
+    "remove",
+    "restoreOld",
+    "setEnabled",
+    "state"
+   ]
+  },
+  {
+   "name": "apps/kos/physlab",
+   "file": "frontend/apps/kos/physlab.lua",
+   "about": "Physics for the simulation apps. Pure Lua, no UI, so it can be tested alone. Physlab.pendulum.new{ n = 3, lengths = {1,1,1}, masses = {1,1,1}, g = 9.81, angles = {...} } p:step(dt) -- one RK4 step p:positions() -- {{x1,y1},...} (pivot at 0,0, y up) p:energy() -- total energy (conserved: a check on the numbers) p:formulas() -- LaTeX lines describing this very frame Physlab.slits.new{ slits = 2, wavelength = 500e-9, separation = 20e-6, width = 5e-6, distance = 1.0 } s:intensity(y) -- relative intensity on the screen at height y (metres) s:addPhotons(k) -- k more photons, each landing where the i",
+   "functions": [
+    "_peak",
+    "_rand",
+    "accel",
+    "addPhotons",
+    "energy",
+    "entropy",
+    "formulas",
+    "fringeSpacing",
+    "intensity",
+    "positions",
+    "reset",
+    "step"
+   ]
+  },
+  {
+   "name": "apps/kos/pipeline",
+   "file": "frontend/apps/kos/pipeline.lua",
+   "about": "Pipelines for the one input box. Text goes in, passes through small steps one after another, and the last step may send it somewhere (open an app, search, a Telegram bot). Pipeline.run(\"hello\", { \"trim\", \"upper\" }, ctx) -> \"HELLO\", trace Pipeline.dispatch(text, pipelines) -> pipeline, rest (first word names a pipeline) Pipeline.register(\"shout\", function(text, ctx) return text .. \"!\" end) A step is function(text, ctx) -> text | nil, \"why it stopped\". A pipeline is { name =, steps = { names... } } and the user's own are kept in the setting kos_pipelines. With no pipeline named, the text goes to",
+   "functions": [
+    "defaults",
+    "dispatch",
+    "hasStep",
+    "httpsPost",
+    "load",
+    "register",
+    "run",
+    "telegramSend"
+   ]
+  },
+  {
+   "name": "apps/kos/restrouter",
+   "file": "frontend/apps/kos/restrouter.lua",
+   "about": "REST router. A request is { method, path, body, client, local_ui }, an answer is status, table. Telegram messages, HTTP requests on this device and the laptop bridge all end up here. Built-in routes (scope in brackets): GET /routes list every route [read] GET /settings/:key read a setting [read] PUT /settings/:key write a setting (keys kos_* only) [write] POST /app/:name open an app by name [control] POST /event/:name send an allowed event [control] POST /pipeline run text through the input pipeline [control] GET /adapters list virtual adapters [read] POST /routes add a route (waits for approv",
+   "functions": [
+    "_builtin",
+    "_reset",
+    "dispatch",
+    "list",
+    "load",
+    "parseText",
+    "render",
+    "setHooks"
+   ]
+  },
+  {
+   "name": "apps/kos/routesview",
+   "file": "frontend/apps/kos/routesview.lua",
+   "about": "Shows the REST routes (built-in and added) on screen, beside the IDE and the embedded model. A route that waits for approval gets Approve and Remove buttons: approval can only happen here, on the device.",
+   "functions": [
+    "show"
+   ]
+  },
+  {
+   "name": "apps/kos/sandboxpolicy",
+   "file": "frontend/apps/kos/sandboxpolicy.lua",
+   "about": "What the top-level model may do inside the sandbox, decided in one place. The model proposes an action, this module answers \"allow\", \"confirm\" (a person says yes on the screen, or by voice with a spoken phrase) or \"deny\". Policy.decide{ kind = \"file.write\", path = \"/sdcard/koreader/sandbox/a.txt\" } -> \"allow\", reason Policy.decide{ kind = \"adapter.arm\", chain = \"knobToEsp\" } -> \"confirm\", reason Autonomy here means: it can read, write inside the sandbox folder, open apps, change kos_ settings and build apps without asking. It cannot change this policy, approve routes, change tokens or leave th",
+   "functions": [
+    "challenge",
+    "confirm",
+    "decide"
+   ]
+  },
+  {
+   "name": "apps/kos/scaling",
+   "file": "frontend/apps/kos/scaling.lua",
+   "about": "dp / sp scaling for KOReader OS, the way Android does it. KOReader normally scales the interface by the size of the screen (its shorter side compared to a 600 px e-reader). On a foldable that means everything doubles in size when you unfold: the screen \"stretches\". Here, as on Android: * dp (interface size): sizes follow the screen's real density, read again whenever the display changes. Unfolding gives you more room, not bigger buttons. \"Interface size\" scales all of it (like Android's display size). * sp (text size): interface text is additionally scaled by \"Text size\" (like Android's font s",
+   "functions": [
+    "apply",
+    "calibration",
+    "factor",
+    "install",
+    "menuItems",
+    "refreshDensity",
+    "textPercent",
+    "uiPercent",
+    "windowClass"
+   ]
+  },
+  {
+   "name": "apps/kos/settingsmap",
+   "file": "frontend/apps/kos/settingsmap.lua",
+   "about": "The settings, grouped by what they cost: TIME (waiting, repeating, response), SPACE (memory, storage, size on screen) and ENERGY (power). The classic settings menu stays underneath; search finds a setting by any name it has ever had (`aliases`), so \"brightness\" still leads somewhere. An entry: { id, group, title, aliases = {...}, kind = \"choice\" | \"toggle\" | \"event\", key = G_reader_settings key, default, choices = { {value, label}, ... }, event = \"EventName\", note } Order inside a group comes from entropy (see docs/osEmbedding.md, section 17): a setting that can change more futures sits nearer",
+   "functions": [
+    "byId",
+    "entropy",
+    "options",
+    "search",
+    "simulate",
+    "tree"
+   ]
+  },
+  {
+   "name": "apps/kos/simwindow",
+   "file": "frontend/apps/kos/simwindow.lua",
+   "about": "Simulation window: a picture drawn from a LaTeX-art scene, the formulas of the current frame underneath, and Play / Step / Reset / Parameters / LaTeX buttons. SimWindow.open{ title = \"Pendulums\", make = function() return sim end, -- a fresh simulation (also on Reset) advance = function(sim) end, -- one frame scene = function(sim) return LatexArt scene end, formulas = function(sim) return { \"tex\", ... } end, params = function(sim, apply) ... end, -- optional: ask for new values, then apply(new_sim) fps = 4, -- e-ink friendly export = function(sim) return tex source end, -- optional: LaTeX sourc",
+   "functions": [
+    "getSize",
+    "open",
+    "paintTo"
+   ]
+  },
+  {
+   "name": "apps/kos/snapshot",
+   "file": "frontend/apps/kos/snapshot.lua",
+   "about": "Snapshot file: where an unfinished discussion stands, as one plain Markdown file. Plain KOReader can open it, nothing else is needed; hand it to an agent and it continues from there. local snap = Snapshot.new{ title = \"Settings tree\", decisions = { \"Groups are time, space, energy\" }, open = { \"Where do volume and contrast go?\" }, next_step = \"Draw the first tree from the usage cases\", formulas = { { tex = \"H = -\\\\sum_i p_i \\\\log_2 p_i\", note = \"Shannon entropy, stand-in for Framal Entropy\" } }, notes = \"free text\", } local text = Snapshot.toMarkdown(snap) local back = Snapshot.parse(text) -- t",
+   "functions": [
+    "fileTopic",
+    "new",
+    "parse",
+    "save",
+    "toMarkdown"
+   ]
+  },
+  {
+   "name": "apps/kos/telegrambot",
+   "file": "frontend/apps/kos/telegrambot.lua",
+   "about": "Telegram bot as a front door to the REST router. The device asks Telegram for new messages (long polling from the device outwards), so nothing on the device is open to the internet. Only chats listed in `chats` are answered; everything else is ignored and counted. local bot = Bot.new{ token = \"123:ABC\", chats = { 42 }, router = Router, json = JSON, transport = fn } bot:poll() -- one round: reads new messages, answers each, returns how many were handled A message \"GET /settings/kos_search_min_chars\" or \"SET /settings/kos_x 5\" becomes a request from the client \"tg<chatId>\", which needs scopes in",
+   "functions": [
+    "api",
+    "new",
+    "poll",
+    "say"
+   ]
+  },
+  {
+   "name": "apps/kos/theme",
+   "file": "frontend/apps/kos/theme.lua",
+   "about": "Themes. One default theme for everything, and any app may override parts of it. Theme.default() -> the default theme table Theme.forApp(\"name\") -> default merged with that app's overrides (a table with .face ready to use) Theme.set(name, key, value) -> override one value for one app (\"default\" changes the default) Theme.clear(name, key) -> remove an override (back to the default) Theme.saveAs(\"night\") / Theme.use(\"night\") / Theme.names() named themes, switch or share Theme.export() -> text, Theme.import(text) themes as plain text lines \"key = value\" Keys: fontSize (pt), lineWidth, cornerRadius",
+   "functions": [
+    "clear",
+    "default",
+    "export",
+    "forApp",
+    "import",
+    "names",
+    "saveAs",
+    "set",
+    "use"
+   ]
+  },
+  {
+   "name": "apps/kos/thumbs",
+   "file": "frontend/apps/kos/thumbs.lua",
+   "about": "Thumbnails: a small picture of what is inside a file, made only when asked for, kept in ONE shared cache with a size cap, oldest removed first. local Thumbs = require(\"apps/kos/thumbs\") local bb = Thumbs.get(\"/sdcard/photo.jpg\", 96) -- blitbuffer or nil Thumbs.textSnippet(\"/sdcard/notes.txt\", 8) -- first lines, for text files Thumbs.cacheInfo() -- { files, bytes, cap } Thumbs.clear() Cache: <data>/cache/kosThumbs/<key>.png. Cap: setting `kos_thumb_cache_mb` (default 100). Nothing is made up front: a folder with 5000 files costs nothing until you look at one.",
+   "functions": [
+    "cacheInfo",
+    "capBytes",
+    "clear",
+    "dir",
+    "get",
+    "key",
+    "kind",
+    "textSnippet",
+    "trim"
+   ]
+  },
+  {
+   "name": "apps/kos/usearch",
+   "file": "frontend/apps/kos/usearch.lua",
+   "about": "Universal search: type, and the results follow the text. Apps and files, in places that are either fixed (the system ones) or added by the user. Settings (G_reader_settings): kos_search_min_chars how many characters before it searches (default 2) kos_search_places list of folder paths the user added Fixed places: the Home screen's apps, the home folder, and Desktop, Downloads and Documents inside it when they exist. Nothing here is searched before the character count is reached. Pure parts (tested without a screen): Search.match, Search.length, Search.shouldRun, Search.scan.",
+   "functions": [
+    "_rebuild",
+    "index",
+    "length",
+    "match",
+    "minChars",
+    "places",
+    "scan",
+    "settingsMenu",
+    "shouldRun",
+    "show"
+   ]
+  },
+  {
+   "name": "apps/kos/versions",
+   "file": "frontend/apps/kos/versions.lua",
+   "about": "Dotted file versions. Every tracked file lives in a folder named after it, together with a change log: something/ the folder something.jpg the file as it is now changes.log one line per change: who, when, why, and the difference that undoes it rebuild.lua plain Lua that rebuilds any older version from the log (no KOReader needed) something..jpg one change back (made on request, see materialize) something...jpg two changes back (each extra dot is one more step, like a derivative) No duplicated data: the log keeps only the difference between a version and the one after it (the part that changed,",
+   "functions": [
+    "change",
+    "dottedName",
+    "get",
+    "isTracked",
+    "materialize",
+    "restore",
+    "timeline",
+    "track"
+   ]
+  },
+  {
+   "name": "apps/kos/windows",
+   "file": "frontend/apps/kos/windows.lua",
+   "about": "Every open app window, full screen or in the split view: a list, a switcher, and several windows (instances) of the same app. * Each window remembers which app opened it; a second window of the same app is titled \"Gemma 2\", a third \"Gemma 3\", … * Windows.showSwitcher(): all open windows. Tap = bring to front. Hold = bring to front / put in the split view / new window of that app / close. * Windows.newInstance(win): another window of the same app (beside it in split view). * Windows.toSplit(win): moves a full-screen window into the split view, keeping its state (the app keeps talking to the sam",
+   "functions": [
+    "add",
+    "allToSplit",
+    "count",
+    "displayTitle",
+    "minimize",
+    "newInstance",
+    "raise",
+    "remove",
+    "shapeMenu",
+    "showSwitcher",
+    "toSplit"
+   ]
+  },
+  {
+   "name": "apps/kos/wintitlebar",
+   "file": "frontend/apps/kos/wintitlebar.lua",
+   "about": "The Windows 11 style title bar of every app window: the app's name on the left, then minimize, maximize (or restore) and close on the right. Home stays at the far left. local bar = WinTitleBar:new{ width = 800, title = \"Gemma\", subtitle = nil, show_parent = window, home = true, on_home = fn, on_home_hold = fn, on_minimize = fn, on_maximize = fn, on_close = fn, maximized = false, -- which icon the middle button shows } bar:getHeight(); bar:setTitle(t); bar:setSubTitle(t) It has the same few methods AppWindow used from KOReader's TitleBar, so nothing else changes.",
+   "functions": [
+    "_build",
+    "_button",
+    "getHeight",
+    "getSize",
+    "init",
+    "setSubTitle",
+    "setTitle"
+   ]
+  },
+  {
+   "name": "apps/kos/workspace",
+   "file": "frontend/apps/kos/workspace.lua",
+   "about": "KOReader OS workspace: several app windows on screen at once. Windows (panes) are kept in a layout tree, so any number of them can be arranged side by side and stacked, nested as deep as you like: split(row) ┌─────────┬─────────┐ ├── pane: Notes │ │ Files │ └── split(column) │ Notes ├─────────┤ ├── pane: Files │ │ Hello │ └── pane: Hello └─────────┴─────────┘ * New windows fill the screen automatically: each one splits the largest window along its longer side, so 2D space is used evenly. * Drag a window by its title bar onto another window to rearrange: drop on an edge to put it on that side, ",
+   "functions": [
+    "_cyclePreset",
+    "_detach",
+    "_dividerAt",
+    "_dropZone",
+    "_handleDividerGesture",
+    "_handleEvent",
+    "_handleMoveGesture",
+    "_insertChild",
+    "_layout",
+    "_layoutNode",
+    "_moveDivider",
+    "_paintDivider",
+    "_paneAt",
+    "_replaceNode",
+    "_titleBarAt",
+    "addPane",
+    "close",
+    "closePane",
+    "defaultDir",
+    "getInstance",
+    "getPanes",
+    "goHome",
+    "handleEvent",
+    "init",
+    "largestPane",
+    "movePane",
+    "onClose",
+    "onCloseWidget",
+    "onScreenResize",
+    "paintTo",
+    "refresh",
+    "relayout",
+    "setRect",
+    "setTitle",
+    "show",
+    "showDividerMenu",
+    "showPaneMenu",
+    "tidy"
+   ]
+  }
+ ],
+ "plugins": [
+  {
+   "id": "applauncher",
+   "name": "Home screen",
+   "about": "A home screen that lists your apps. Any plugin can become an app: see doc/Apps.md.",
+   "is_app": false,
+   "file": "plugins/applauncher.koplugin/main.lua"
+  },
+  {
+   "id": "appinstaller",
+   "name": "App installer",
+   "about": "Install apps and plugins from .zip files: tap a zip in the file browser. Also lists installed apps so you can remove them.",
+   "is_app": true,
+   "file": "plugins/appinstaller.koplugin/main.lua"
+  },
+  {
+   "id": "studio",
+   "name": "Studio",
+   "about": "Write KOReader OS apps on the device: create an app from a template, edit its files, check them for errors, read the log, and package the app as a .zip to share.",
+   "is_app": true,
+   "file": "plugins/studio.koplugin/main.lua"
+  },
+  {
+   "id": "sheets",
+   "name": "Sheets",
+   "about": "View spreadsheets: .csv, .tsv and .xlsx. Edit and save CSV/TSV files, with simple formulas (=SUM(A1:A9), =A1*B2, AVERAGE, MIN, MAX, COUNT).",
+   "is_app": true,
+   "file": "plugins/sheets.koplugin/main.lua"
+  },
+  {
+   "id": "latexview",
+   "name": "LaTeX view",
+   "about": "Read .tex files as formatted pages: sections, lists, tables, footnotes and math (shown with Unicode symbols, fractions, sub- and superscripts). Not a full TeX engine: unusual packages and macros are skipped.",
+   "is_app": true,
+   "file": "plugins/latexview.koplugin/main.lua"
+  },
+  {
+   "id": "focus",
+   "name": "Focus",
+   "about": "ADHD-friendly helpers: one task \"now\" broken into small steps, a focus timer with breaks, a one-tap inbox to jot down stray thoughts (also from a gesture while reading), and gentle break reminders while reading.",
+   "is_app": true,
+   "file": "plugins/focus.koplugin/main.lua"
+  },
+  {
+   "id": "gemma",
+   "name": "Gemma",
+   "about": "Chat with the Gemma running on your laptop (Ollama). The same conversation on the laptop and the phone. Replies can be read aloud, repeated and replayed from the cache, through Bluetooth earbuds when connected.",
+   "is_app": true,
+   "file": "plugins/gemma.koplugin/main.lua"
+  },
+  {
+   "id": "updates",
+   "name": "Updates",
+   "about": "Install updates for KOReader's own apps from a .zip, and keep your own edited copies of built-in app files. Each replacement can be switched on and off. If KOReader stops starting, they switch themselves off.",
+   "is_app": true,
+   "file": "plugins/updates.koplugin/main.lua"
+  },
+  {
+   "id": "icons",
+   "name": "Icons",
+   "about": "Draw icons, or correct the ones KOReader uses. Start from a blank page or trace over an existing icon, with lines, shapes and ready-made stamps. Saved icons replace the ones with the same name everywhere after a restart.",
+   "is_app": true,
+   "file": "plugins/icons.koplugin/main.lua"
+  },
+  {
+   "id": "logcat",
+   "name": "Logcat",
+   "about": "A colour-coded log viewer like Android Studio's Logcat: errors red, warnings orange, debug grey. Reads the Android log, forkPreview.log and crash.log, filters by level and text, and pages from the newest line.",
+   "is_app": true,
+   "file": "plugins/logcat.koplugin/main.lua"
+  },
+  {
+   "id": "preview",
+   "name": "Preview",
+   "about": "Adds \"Preview\" to a file's long-press menu: a picture for images and book covers, the first lines for text files. Pictures are made only when you ask, and kept in one small shared cache (100 MB by default).",
+   "is_app": false,
+   "file": "plugins/preview.koplugin/main.lua"
+  },
+  {
+   "id": "share",
+   "name": "Share",
+   "about": "Send files to your laptop's shared folder and fetch files from it, over Wi-Fi. Uses the same laptop address and PIN as the Gemma app. Also adds \"Send to laptop\" to a file's long-press menu.",
+   "is_app": true,
+   "file": "plugins/share.koplugin/main.lua"
+  },
+  {
+   "id": "pendulums",
+   "name": "Pendulums",
+   "about": "Double, triple and N pendulums swinging together, drawn as LaTeX art with the equations of each frame below. Change the number, lengths, masses, gravity and start angles under Parameters.",
+   "is_app": true,
+   "file": "plugins/pendulums.koplugin/main.lua"
+  },
+  {
+   "id": "lightlab",
+   "name": "Light lab",
+   "about": "Young's experiment: photons arrive one frame at a time through one slit or two, and the pattern builds up on the screen. Each frame shows its own formulas. Change wavelength, slit width, spacing, distance and photons per frame under Parameters.",
+   "is_app": true,
+   "file": "plugins/lightlab.koplugin/main.lua"
+  },
+  {
+   "id": "viewer3d",
+   "name": "3D viewer",
+   "about": "Open a 3D model (STL) or a design script (Lua), turn it, and read what a print needs to know: size, volume, surface, weight in PLA, PETG, ABS or resin, whether the shape is closed, and how much overhangs. Design scripts build shapes from boxes and cylinders; Export STL saves the result for a slicer.",
+   "is_app": true,
+   "file": "plugins/viewer3d.koplugin/main.lua"
+  },
+  {
+   "id": "snapshot",
+   "name": "Snapshots",
+   "about": "Save where an unfinished discussion stands as one plain Markdown file: decisions, open questions, the next step and the formulas in play. Open it later here, or hand it to an assistant to continue from the same point.",
+   "is_app": true,
+   "file": "plugins/snapshot.koplugin/main.lua"
+  },
+  {
+   "id": "versions",
+   "name": "File versions",
+   "about": "Keep every change of a file: a folder named after the file holds the file, a change log (who changed it, when, why, and only the part that changed) and a script that rebuilds any older version. Older versions are named with extra dots: photo..jpg is one change back, photo...jpg two.",
+   "is_app": true,
+   "file": "plugins/versions.koplugin/main.lua"
+  },
+  {
+   "id": "settings",
+   "name": "Settings",
+   "about": "Every setting under one of three heads: Time, Space, Energy. The first ones in each head are the ones that change the most. Search finds a setting by any name it has had (brightness leads to Light). The classic settings menu is still there, at the bottom.",
+   "is_app": true,
+   "file": "plugins/settings.koplugin/main.lua"
+  },
+  {
+   "id": "idehandoff",
+   "name": "Open in IDE",
+   "about": "Adds \"Open in IDE\" to the file menu for source and text files. Pick your IDE once under Tools, then one tap hands the file to it.",
+   "is_app": false,
+   "file": "plugins/idehandoff.koplugin/main.lua"
+  },
+  {
+   "id": "canvas",
+   "name": "Canvas",
+   "about": "An endless page. Drag to move over it in every direction, hold an empty spot to put a note or an app there, hold an item to move or remove it.",
+   "is_app": true,
+   "file": "plugins/canvas.koplugin/main.lua"
+  },
+  {
+   "id": "debugger",
+   "name": "Debugger",
+   "about": "Debug session report (breakpoints, snapshots, most called functions) and ADB devices. Breakpoints are set from the laptop or a script and record the variables without stopping the screen.",
+   "is_app": true,
+   "file": "plugins/debugger.koplugin/main.lua"
+  },
+  {
+   "id": "restbot",
+   "name": "REST and bot",
+   "about": "Telegram messages and HTTP requests become REST calls on this device: GET and SET settings, open apps, send events, add routes on the fly. New routes wait for your approval here. Only the chats and tokens you list are answered.",
+   "is_app": true,
+   "file": "plugins/restbot.koplugin/main.lua"
+  },
+  {
+   "id": "entropy",
+   "name": "Entropy",
+   "about": "Type the weights of events, positions and frames. The formula appears in LaTeX with your numbers put in, with the lowest and highest possible value. Labelled Shannon entropy until Framal Entropy has a definition.",
+   "is_app": true,
+   "file": "plugins/entropy.koplugin/main.lua"
+  },
+  {
+   "id": "themes",
+   "name": "Themes",
+   "about": "One default look for every app, and any app can have its own. Font size, line strength, corner roundness, spacing, icon size. Save a look under a name and switch to it later.",
+   "is_app": true,
+   "file": "plugins/themes.koplugin/main.lua"
+  },
+  {
+   "id": "folderfile",
+   "name": "Folder per file",
+   "about": "Adds \"Wrap in its own folder\" to the file menu: the file moves into a folder with its name, with a plain text note beside it that holds the file's entropy in LaTeX. \"Unwrap\" puts it back and keeps the note.",
+   "is_app": false,
+   "file": "plugins/folderfile.koplugin/main.lua"
+  }
+ ],
+ "routes": [
+  {
+   "id": "b1",
+   "method": "GET",
+   "path": "/routes",
+   "scope": "read",
+   "about": "list every route"
+  },
+  {
+   "id": "b2",
+   "method": "GET",
+   "path": "/settings/:key",
+   "scope": "read",
+   "about": "read a setting"
+  },
+  {
+   "id": "b3",
+   "method": "PUT",
+   "path": "/settings/:key",
+   "scope": "write",
+   "about": "write a setting, keys starting kos_ only"
+  },
+  {
+   "id": "b4",
+   "method": "POST",
+   "path": "/app/:name",
+   "scope": "control",
+   "about": "open an app by name"
+  },
+  {
+   "id": "b5",
+   "method": "POST",
+   "path": "/event/:name",
+   "scope": "control",
+   "about": "send an allowed event"
+  },
+  {
+   "id": "b6",
+   "method": "POST",
+   "path": "/pipeline",
+   "scope": "control",
+   "about": "run text through the input pipeline"
+  },
+  {
+   "id": "b7",
+   "method": "GET",
+   "path": "/adapters",
+   "scope": "read",
+   "about": "list virtual adapters"
+  },
+  {
+   "id": "b8",
+   "method": "POST",
+   "path": "/routes",
+   "scope": "admin",
+   "about": "add a route, it waits for approval"
+  },
+  {
+   "id": "b9",
+   "method": "DELETE",
+   "path": "/routes/:id",
+   "scope": "admin",
+   "about": "remove a custom route"
+  },
+  {
+   "id": "b10",
+   "method": "PUT",
+   "path": "/routes/:id/approve",
+   "scope": "admin",
+   "about": "approve a custom route (local screen only)"
+  }
+ ],
+ "clib": [
+  {
+   "name": "kosLinkCrc16",
+   "args": "const uint8_t *data, size_t len"
+  },
+  {
+   "name": "kosLinkInit",
+   "args": "kosLinkParser *p"
+  },
+  {
+   "name": "kosLinkFeed",
+   "args": "kosLinkParser *p, uint8_t byte, kosLinkFrame *out"
+  },
+  {
+   "name": "kosLinkEncode",
+   "args": "uint8_t type, uint8_t seq, const uint8_t *payload, uint8_t len, uint8_t *out, size_t cap"
+  },
+  {
+   "name": "kosLinkPutData",
+   "args": "uint8_t channel, int32_t milli, uint8_t payload[5]"
+  }
+ ],
+ "protocols": [
+  {
+   "name": "kosLink",
+   "about": "Frame protocol to small devices (ESP32, ATmega): 0x7E, version, type, seq, len, payload, CRC-16/CCITT. Lua: apps/kos/linkproto, C: embedded/kosLink.",
+   "files": [
+    "frontend/apps/kos/linkproto.lua",
+    "embedded/kosLink/kosLink.c"
+   ]
+  },
+  {
+   "name": "REST router",
+   "about": "GET, PUT, POST, DELETE on paths; scopes read, write, control, admin; routes added at run time wait for approval on the screen.",
+   "files": [
+    "frontend/apps/kos/restrouter.lua"
+   ]
+  },
+  {
+   "name": "Laptop bridge",
+   "about": "HTTP with X-Bridge-Pin and X-Bridge-Client; registry of clients with scopes info, chat, audio, files.read, files.write.",
+   "files": [
+    "tools/gemmaBridge/gemma_bridge.py",
+    "tools/gemmaBridge/registry.py"
+   ]
+  },
+  {
+   "name": "Telegram front door",
+   "about": "The device polls a bot; only listed chats are answered; messages become REST calls.",
+   "files": [
+    "frontend/apps/kos/telegrambot.lua"
+   ]
+  }
+ ],
+ "policy": {
+  "about": "What the model may do on its own: allow, confirm, deny, from apps/kos/sandboxpolicy.lua",
+  "file": "frontend/apps/kos/sandboxpolicy.lua"
+ }
+}
