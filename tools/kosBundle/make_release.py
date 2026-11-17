@@ -28,6 +28,7 @@ APPS = [  # id, label, needs
     ("lightlab", "Light lab (double slit)", "bundle"),
     ("viewer3d", "3D viewer (STL, design scripts)", "bundle"),
     ("snapshot", "Snapshots (save where a discussion stands)", "bundle"),
+    ("versions", "File versions (change log, dotted copies)", "bundle"),
 ]
 
 def read(rel):
