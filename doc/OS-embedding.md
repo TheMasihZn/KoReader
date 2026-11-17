@@ -122,3 +122,15 @@ cannot tell the difference except by speed. The GPU driver in section 6 is the f
 
 Open choice for the OS chat: a single "virtual device" daemon that owns the registry and loads one plugin
 per class, or one small driver per class that registers itself. The first is easier to keep consistent.
+
+## 8. Pre-AI text corpus (declared, not built)
+
+Goal from the user: a body of human writing from before AI-generated text and boilerplate existed, to use for
+the consciousness work (a model trained on inputs the user picked, with a continuous training phase on top).
+
+- Sources named: Internet Archive scans of books and newspapers, Project Gutenberg, Common Crawl snapshots from
+  before 2022, dated Wikipedia dumps.
+- Rule: a fixed cutoff date per source; old dumps stay old, so nothing newer enters.
+- Why own corpus: an existing model cannot be split back into its training pages; only the inputs can be chosen.
+- Not decided: which archives are still available, their sizes, and the model to train. Next step is a search for
+  these, then a size and licence list.
