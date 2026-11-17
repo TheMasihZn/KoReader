@@ -8,7 +8,9 @@ from the Home button of any AppWindow, or automatically at startup.
 
 local AppRegistry = require("apps/kos/appregistry")
 local AppWindow = require("apps/kos/appwindow")
+local Blitbuffer = require("ffi/blitbuffer")
 local Button = require("ui/widget/button")
+local LineWidget = require("ui/widget/linewidget")
 local ButtonDialog = require("ui/widget/buttondialog")
 local CenterContainer = require("ui/widget/container/centercontainer")
 local Device = require("device")
@@ -97,6 +99,45 @@ function AppTile:onHoldTile()
     return true
 end
 
+-- Chat style Home: one app per line, plain text, no bubbles (name, then what it does).
+local ChatRow = InputContainer:extend{ app = nil, width = nil, callback = nil, hold_callback = nil }
+
+function ChatRow:init()
+    local title_face = Font:getFace("cfont", 20)
+    local sub_face = Font:getFace("smallinfofont")
+    local pad = Size.padding.large
+    local text_w = self.width - 2 * pad
+    local first = (self.app.description or ""):match("^([^%.%\n]+)") or ""
+    local group = VerticalGroup:new{
+        align = "left",
+        TextWidget:new{ text = self.app.title, face = title_face, bold = true, max_width = text_w },
+    }
+    if first ~= "" then
+        table.insert(group, TextWidget:new{ text = first, face = sub_face, max_width = text_w, fgcolor = Blitbuffer.COLOR_DARK_GRAY })
+    end
+    local h = group:getSize().h + 2 * Size.padding.default
+    self.dimen = Geom:new{ x = 0, y = 0, w = self.width, h = h + Size.line.thin }
+    self[1] = VerticalGroup:new{
+        align = "left",
+        FrameContainer:new{ bordersize = 0, padding = Size.padding.default, padding_left = pad, padding_right = pad, margin = 0, group },
+        LineWidget:new{ dimen = Geom:new{ w = self.width, h = Size.line.thin }, background = Blitbuffer.COLOR_LIGHT_GRAY },
+    }
+    self.ges_events = {
+        TapRow = { GestureRange:new{ ges = "tap", range = function() return self.dimen end } },
+        HoldRow = { GestureRange:new{ ges = "hold", range = function() return self.dimen end } },
+    }
+end
+
+function ChatRow:onTapRow()
+    if self.callback then self.callback(self.app) end
+    return true
+end
+
+function ChatRow:onHoldRow()
+    if self.hold_callback then self.hold_callback(self.app) end
+    return true
+end
+
 local AppLauncher = WidgetContainer:extend{
     name = "applauncher",
     page = 1,
@@ -178,6 +219,17 @@ function AppLauncher:addToMainMenu(menu_items)
             {
                 text = _("Open home screen"),
                 callback = function() self:onShowAppLauncher() end,
+            },
+            {
+                text = _("Home view"),
+                sub_item_table = {
+                    { text = _("Chat (plain lines, input at the bottom)"), radio = true,
+                      checked_func = function() return (G_reader_settings:readSetting("kos_home_view") or "chat") == "chat" end,
+                      callback = function() G_reader_settings:saveSetting("kos_home_view", "chat") end },
+                    { text = _("Grid of icons"), radio = true,
+                      checked_func = function() return G_reader_settings:readSetting("kos_home_view") == "grid" end,
+                      callback = function() G_reader_settings:saveSetting("kos_home_view", "grid") end },
+                },
             },
             require("apps/kos/usearch").settingsMenu(),
             {
@@ -353,12 +405,13 @@ function AppLauncher:onShowAppLauncher(args)
         subtitle = self.split_target and _("Pick an app for the new window") or dateText(),
         home_button = false,
         in_switcher = false,
-        build = function(window, width, height) return self:buildGrid(window, width, height) end,
+        build = function(window, width, height) return self:buildHome(window, width, height) end,
         on_close = function()
             UIManager:unschedule(self.tick)
             self.window = nil
         end,
     }
+    self:listenForTyping(self.window)
     -- Keep the clock current while the home screen is open.
     self.tick = self.tick or function()
         if not self.window then return end
@@ -457,6 +510,130 @@ function AppLauncher:showAppMenu(app, window)
         },
     }
     UIManager:show(dialog)
+end
+
+--- Home view: "chat" (default) or "grid". If the chat view fails for any reason the grid is shown.
+function AppLauncher:buildHome(window, width, height)
+    if (G_reader_settings:readSetting("kos_home_view") or "chat") == "chat" then
+        local ok, result = pcall(self.buildChat, self, window, width, height)
+        if ok then return result end
+        require("logger").err("Home chat view failed, showing the grid:", result)
+    end
+    return self:buildGrid(window, width, height)
+end
+
+function AppLauncher:buildChat(window, width, height)
+    local apps = AppRegistry:getApps()
+    local margin = Size.padding.fullscreen
+    local inner_w = width - 2 * margin
+    local nav_h = Screen:scaleBySize(56)
+    local input_h = Screen:scaleBySize(56)
+    local avail = height - 2 * margin - nav_h - input_h
+    local probe = ChatRow:new{ app = apps[1] or { title = "Ag", description = "Ag" }, width = inner_w }
+    local row_h = probe:getSize().h
+    probe:free()
+    local per_page = math.max(1, math.floor(avail / row_h))
+    local pages = math.max(1, math.ceil(#apps / per_page))
+    if self.page > pages then self.page = pages end
+
+    local list = VerticalGroup:new{ align = "left" }
+    for i = (self.page - 1) * per_page + 1, math.min(#apps, self.page * per_page) do
+        table.insert(list, ChatRow:new{
+            app = apps[i], width = inner_w,
+            callback = function(a) self:tapApp(a, window) end,
+            hold_callback = function(a) self:showAppMenu(a, window) end,
+        })
+    end
+
+    local nav = HorizontalGroup:new{ align = "center" }
+    if pages > 1 then
+        local btn_w = Screen:scaleBySize(64)
+        table.insert(nav, Button:new{ text = "‹", width = btn_w, show_parent = window, enabled = self.page > 1,
+            callback = function() self.page = self.page - 1; window:refresh() end })
+        table.insert(nav, CenterContainer:new{ dimen = Geom:new{ w = Screen:scaleBySize(140), h = nav_h },
+            TextWidget:new{ text = T(_("Page %1 of %2"), self.page, pages), face = Font:getFace("smallinfofont") } })
+        table.insert(nav, Button:new{ text = "›", width = btn_w, show_parent = window, enabled = self.page < pages,
+            callback = function() self.page = self.page + 1; window:refresh() end })
+    end
+
+    -- The input line: always at the bottom. Tap it, or just type on a connected keyboard.
+    local input = Button:new{
+        text = _("Type here — search, open an app, or send to a bot"),
+        width = inner_w, bordersize = Size.border.default, radius = Size.radius.window,
+        show_parent = window, align = "left",
+        callback = function() self:openInput("") end,
+    }
+    return FrameContainer:new{
+        padding = margin, margin = 0, bordersize = 0,
+        VerticalGroup:new{
+            align = "left",
+            CenterContainer:new{ dimen = Geom:new{ w = inner_w, h = avail }, list },
+            CenterContainer:new{ dimen = Geom:new{ w = inner_w, h = nav_h }, nav },
+            input,
+        },
+    }
+end
+
+--- The text goes through a pipeline (apps/kos/pipeline.lua): a first word that names a pipeline picks it
+-- ("bot hello"), otherwise it is a search.
+function AppLauncher:runInput(text)
+    local Pipeline = require("apps/kos/pipeline")
+    local Search = require("apps/kos/usearch")
+    local pipelines = Pipeline.load()
+    local p, rest = Pipeline.dispatch(text, pipelines)
+    local steps = p and p.steps or { "trim", "search" }
+    local ctx = {
+        search = function(t) Search.show(t) end,
+        findApp = function(t)
+            local items = {}
+            for _i, a in ipairs(AppRegistry:getApps()) do
+                items[#items + 1] = { name = a.title, lname = a.title:lower(), app = a }
+            end
+            local hit = Search.match(items, t, 1)[1]
+            return hit and hit.app
+        end,
+        openApp = function(a) self:tapApp(a, self.window) end,
+    }
+    local out, trace, err = Pipeline.run(rest, steps, ctx)
+    for _i, line in ipairs(trace) do require("logger").dbg("pipeline:", line) end
+    if out == nil then
+        UIManager:show(InfoMessage:new{ text = tostring(err), icon = "notice-warning", timeout = 5 })
+    elseif p and p.name == "bot" then
+        UIManager:show(InfoMessage:new{ text = _("Sent."), timeout = 2 })
+    end
+end
+
+function AppLauncher:openInput(prefill)
+    local InputDialog = require("ui/widget/inputdialog")
+    local d
+    d = InputDialog:new{
+        title = _("Type"),
+        input = prefill or "",
+        input_hint = _("words to search, “open gemma”, “bot hello”"),
+        buttons = {{
+            { text = _("Cancel"), callback = function() UIManager:close(d) end },
+            { text = _("Go"), is_enter_default = true, callback = function()
+                local text = d:getInputText()
+                UIManager:close(d)
+                if text ~= "" then self:runInput(text) end
+            end },
+        }},
+    }
+    UIManager:show(d)
+    d:onShowKeyboard()
+end
+
+--- A connected hardware keyboard: the first letter pressed on Home opens the input line with it typed.
+function AppLauncher:listenForTyping(window)
+    if not window or not Device.input or not Device.input.group or not Device.input.group.Alphabet then return end
+    window.key_events = window.key_events or {}
+    window.key_events.StartTyping = { { Device.input.group.Alphabet }, event = "StartTyping" }
+    window.onStartTyping = function(_w, _args, ev)
+        local name = ev and ev.key and ev.key.key
+        if type(name) ~= "string" or #name ~= 1 then return false end
+        self:openInput(name:lower())
+        return true
+    end
 end
 
 function AppLauncher:buildGrid(window, width, height)
