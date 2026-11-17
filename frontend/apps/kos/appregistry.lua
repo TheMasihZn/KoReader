@@ -119,6 +119,8 @@ function AppRegistry:getApps()
                 order = b.order,
                 action = b.action,
                 wrapper_launch = b.launch,
+                needs = b.needs,
+                status = b.status,
             })
         end
     end
@@ -139,6 +141,8 @@ function AppRegistry:getApps()
                 wrapper_launch = app.launch,
                 event = app.event,
                 action = app.action,
+                needs = app.needs,
+                status = app.status,
             })
         end
     end
@@ -221,6 +225,16 @@ function AppRegistry:launch(app, opts)
             text = T(_("%1 can't open in a split view yet: it uses its own full-screen window."), app.title),
         })
         return
+    end
+    if not (opts and opts.force) and (app.needs or app.status == "development") then
+        local Common = require("apps/kos/common")
+        local missing = Common.unmet(app.needs)
+        if #missing > 0 or app.status == "development" then
+            Common.notice(app.title, missing, app.status == "development", function()
+                AppRegistry:launch(app, { split = split, force = true })
+            end)
+            return
+        end
     end
     local Debugger = require("apps/kos/debugger")
     if Debugger.isDisabled(app.id) then
