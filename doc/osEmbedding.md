@@ -311,3 +311,24 @@ locals, call counts, timing spans, session log file), `adb.lua` (an `adb` progra
 logcat, install, push, pull). Breakpoints in the UI thread record and continue; they cannot wait for a person.
 Declared, not built: an ADB daemon (`adbd`) inside the OS image, a debugger front end on the laptop that sets
 breakpoints and steps through the bridge, a layout inspector like Android Studio's. These need the OS layer.
+
+## 23. Virtual adapters, kosLink, sandbox policy: where this departs from the usual way
+Built: `adapters.lua` (chains with perturbations, chains feeding chains, a device end over kosLink, held until armed),
+`linkproto.lua` and `embedded/kosLink/kosLink.c` (same frame bytes, tested against each other, 879 bytes of code, no malloc),
+`sandboxpolicy.lua` (allow, confirm, deny with a spoken challenge phrase).
+Declared: embedded studio (the C library goes into it), voice commands reaching every route, flashing ESP32 and ATmega.
+
+Your design, the usual way, and the weak points:
+1. A model with autonomy over everything in the sandbox. Usual: least privilege, a human gate for anything with effects outside.
+   Weak points: a prompt injected through a file, a web page or a chat message can steer it; a wrong action on real hardware can
+   burn a pin or a motor. Kept: it acts freely inside `/sdcard/koreader/sandbox`, every allowed action goes to the journal, files
+   are undone through dotted versions and git restore points. Not given: changing the policy, approving routes, changing tokens,
+   and anything outside the phone without a yes (hardware, network, packages, deleting).
+2. Telegram as a front door. Usual: a signed webhook on a server. Yours is simpler (the phone polls), but a stolen bot token or an
+   allowed chat on a lost phone can reach the REST routes. Kept: only listed chat ids, scopes per client, `kos_` settings only,
+   events from an allowlist, custom routes wait for approval on the screen, no "run any Lua" action.
+3. Chaining adapters into real devices. Usual: a fixed driver per device. A chain can send wrong values at speed; kept: output
+   is held until you arm the chain, and arming asks for a spoken phrase.
+4. Embedded link in plain bytes with a CRC, no encryption. A device on the same wire can read and write. Fine on a bench, not on an
+   open network; add a key-based signature before it leaves the desk.
+5. HTTP on the phone listens on 127.0.0.1 only, token in a header. Opening it to the network needs TLS and per-client tokens first.
