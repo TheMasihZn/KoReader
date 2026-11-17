@@ -37,6 +37,7 @@ APPS = [  # id, label, needs
     ("entropy", "Entropy (LaTeX applet)", "bundle"),
     ("themes", "Themes (default and per app)", "bundle"),
     ("folderfile", "Folder per file", "bundle"),
+    ("terminal", "Terminal emulator with minimize", "bundle"),
 ]
 
 def read(rel):

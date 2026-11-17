@@ -83,6 +83,23 @@ function App:showEntries(title, entries, win)
             end
             self:change(item.entry, reopen)
         end,
+        onMenuHold = function(_, item)
+            local e = item.entry
+            require("apps/kos/contextmenu").show{
+                title = e.title,
+                items = {
+                    { text = _("Change"), callback = function() self:change(e, reopen) end },
+                    { text = _("Back to default"), enabled = e.kind ~= "event", callback = function()
+                        if e.key then G_reader_settings:delSetting(e.key) end
+                        reopen()
+                    end },
+                    { text = _("What is this?"), callback = function()
+                        UIManager:show(InfoMessage:new{ text = (e.note or e.title) .. "\n" .. (e.key and ("(" .. e.key .. ")") or ""), timeout = 6 })
+                    end },
+                },
+            }
+            return true
+        end,
         close_callback = function() UIManager:close(menu) end,
     }
     UIManager:show(menu)

@@ -84,4 +84,16 @@ function KeyboardToolbar.row(ctx)
     return row
 end
 
+-- "Next key": types the letter that most often follows the one before the cursor (apps/kos/keyboardmodel.lua).
+KeyboardToolbar.register{ id = "nextKey", text = "▸", callback = function(ctx)
+    local ok, K = pcall(require, "apps/kos/keyboardmodel")
+    if not ok or not ctx or not ctx.input then return end
+    local text = ctx.input.getInputText and ctx.input:getInputText() or ""
+    local last = text:match("(%a)%s*$")
+    if not last then return end
+    local f = K.bigrams(K.sample .. " " .. text)
+    local guess = K.predict(f, last, 1)[1]
+    if guess and ctx.input.addChars then ctx.input:addChars(guess) end
+end }
+
 return KeyboardToolbar

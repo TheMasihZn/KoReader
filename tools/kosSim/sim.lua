@@ -74,7 +74,8 @@ local function strictEnv(modname)
     str.format = function(f, ...) local a = table.pack(...); for i = 1, a.n do if isStub(a[i]) then a[i] = 8 end end return string.format(f, table.unpack(a, 1, a.n)) end
     env.string = str
     env.jit = { os = "Linux", arch = "x64" }
-    env.bit = { band = function(a, b) return a & b end, bor = function(a, b) return a | b end, bxor = function(a, b) return a ~ b end }
+    local function n(v) return math.type(v) == "integer" and v or 0 end
+    env.bit = { band = function(a, b) return n(a) & n(b) end, bor = function(a, b) return n(a) | n(b) end, bxor = function(a, b) return n(a) ~ n(b) end, lshift = function(a, b) return n(a) << n(b) end, rshift = function(a, b) return n(a) >> n(b) end, bnot = function(a) return ~n(a) end }
     env.G_reader_settings = G
     env.DEBUG = allowed.DEBUG
     env.require = function(name) return real.require(name, modname) end

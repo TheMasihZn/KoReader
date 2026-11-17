@@ -360,6 +360,9 @@ function Terminal:generateInputDialog()
         allow_newline = false,
         cursor_at_end = true,
         fullscreen = true,
+        -- KOReader OS: the left slot of the title bar becomes "minimize" (the shell keeps running); the right slot stays "close".
+        title_bar_left_icon = "kos.minimize",
+        title_bar_left_icon_tap_callback = function() self:minimize() end,
         inputtext_class = TermInputText,
         buttons = {{
             {
@@ -491,6 +494,25 @@ end
 
 function Terminal:onClose()
     self:killShell()
+end
+
+--- Hide the terminal without ending the shell; launching the app again brings it back.
+function Terminal:minimize()
+    if not self.input_dialog then return end
+    self.minimized = true
+    UIManager:close(self.input_dialog)
+end
+
+--- Home / app launcher entry: start the terminal, or bring a minimized one back.
+function Terminal:launchApp()
+    if self.minimized and self.input_dialog then
+        self.minimized = false
+        UIManager:show(self.input_dialog)
+        UIManager:scheduleIn(0.1, Terminal.refresh, self, true)
+        self.input_dialog:onShowKeyboard(true)
+        return
+    end
+    self:onTerminalStart()
 end
 
 -- Kill the shell on plugin teardown

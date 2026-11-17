@@ -130,8 +130,18 @@ Status: built, declared (written in `osEmbedding.md`, not built), or open.
 | 98 | REST router with GET/PUT/POST/DELETE, routes added on the fly, approval on the screen | you | built |
 | 99 | REST routes listed in Studio | you | built |
 | 100 | HTTP front on this phone (127.0.0.1) | you | built, untested on device |
-| 101 | Virtual adapter chain for input and output devices, with perturbations | you | in progress |
-| 102 | Link library in C for ESP32 and ATmega (to go into the embedded studio) | you | in progress |
+| 101 | Virtual adapter chain for input and output devices, with perturbations | you | built (adapters.lua, tested) |
+| 102 | Link library in C for ESP32 and ATmega (to go into the embedded studio) | you | built (kosLink.c and linkproto.lua, tested against each other) |
 | 103 | Embedded studio | you | declared |
 | 104 | Voice commands reach every app and route | you | declared (needs voice session with tools) |
 | 105 | Top-level LLM with autonomy in the sandbox | you | declared with guardrails, see osEmbedding.md 23 |
+| 106 | Capability directory served by MCP | you | built |
+| 107 | Entropy applet with LaTeX | you | built, Shannon stand-in |
+| 108 | Folder per file with text note | you | built |
+| 109 | John Doe starter app | you | built |
+| 110 | Theme layer, default plus per-app | you | built, not yet applied by every app |
+| 111 | Gestures inside Collections and other full-screen menus | you | built, device test open |
+| 112 | Terminal minimize and Home entry | you | built, device test open; three-button bar and bottom bar open |
+| 113 | Keyboard travel model and next-key button | you | built; real keyboard (input method) open |
+| 114 | Touch-sized hold menu | you | built in Settings; other places open |
+| 115 | Change journal and restore points | you | built |

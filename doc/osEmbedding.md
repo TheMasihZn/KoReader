@@ -342,3 +342,9 @@ Your design, the usual way, and the weak points:
   never get renamed pile up; the rename rewrites the name inside `_meta.lua` and `main.lua` only.
 - Themes (`theme.lua`). Per-app override over one default, as you asked. Weak point: many overrides make the system look uneven; `Back to default` clears one key.
 - Entropy (`entropycalc.lua`): Shannon stand-in, labelled as such everywhere. The sum over independent axes is an assumption, not your definition.
+
+## 25. Gestures in menus, terminal, keyboard, touch menu: departures and what is not done
+- Gestures through full-screen menus: stock KOReader keeps them local to the menu. Yours: assigned gestures reach the file browser. Weak point: a hold you assigned now also fires inside Collections where item-hold was used; switch off with `kos_menu_gestures`. Not verified on the Fold.
+- Terminal: only the left slot (minimize) and right slot (close) of the stock title bar; the name stays centred and maximize is not there because the terminal is already full screen. The three-button Windows bar with the name at the left and the camera cut-out needs the terminal inside an app window, not done. The bottom bar is not done.
+- Keyboard: a real Samsung or Google style keyboard is an Android input method (a separate app, needs the launcher fork). Built: the travel model (`keyboardmodel.lua`), a next-key button on the toolbar. The 42 percent saving in the test is on a tiny sample text and will be smaller on real text.
+- Touch menu (`contextmenu.lua`): bigger buttons through `font_size` and `height`; if the stock ButtonDialog ignores them the menu is stock-sized.

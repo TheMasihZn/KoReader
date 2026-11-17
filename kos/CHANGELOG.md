@@ -3,6 +3,18 @@
 One section per version. The release script copies the section matching `kos/VERSION` into the release notes.
 Write what changed in plain facts, one line each.
 
+## 0.5.0 (2026-11-17)
+- Simulation harness `tools/kosSim/sim.lua`: every bundled plugin loads and opens headless; a missing `require` is an error.
+- REST router: Telegram bot (the phone polls, only listed chats), HTTP on 127.0.0.1, routes added on the fly, approval only on the screen, list in Studio.
+- Virtual adapters: chains of perturbations ending in a real device over kosLink, held until armed. kosLink in Lua and C (ESP32, ATmega), tested against each other.
+- Sandbox policy for the embedded model: allow, confirm, deny; hardware, network, packages and deleting ask first.
+- Capability directory (generated) and an MCP server so the model can look things up. Release carries capabilities.json and .md.
+- Entropy applet (LaTeX, Shannon stand-in), folder per file with a text note, John Doe starter app, themes (default plus per-app).
+- Gestures you assigned now work inside full-screen menus such as Collections (setting kos_menu_gestures).
+- Terminal: minimize button (the shell keeps running) and an app entry on Home.
+- Hold a setting: a big touch menu. Keyboard: model for finger travel and a next-key button on the toolbar.
+- Change journal and restore points (`tools/kosBundle/journal.sh`).
+
 ## 0.4.0 (2026-11-17)
 - Debug session: breakpoints with conditions, snapshots of the variables, post-mortem on errors, most-called
   functions, timing spans, a log file. Debugger app with report, breakpoints and ADB devices.
