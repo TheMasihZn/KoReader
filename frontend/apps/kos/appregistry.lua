@@ -166,6 +166,14 @@ function AppRegistry:launch(app, opts)
         })
         return
     end
+    local Debugger = require("apps/kos/debugger")
+    if Debugger.isDisabled(app.id) then
+        UIManager:show(InfoMessage:new{
+            text = T(_("%1 is switched off because KOReader closed while it was starting.\n\nSwitch it on again in Home screen menu > Debug."), app.title),
+        })
+        return
+    end
+    Debugger.launching(app.id)
     AppWindow.pending_target = split
     local Windows = require("apps/kos/windows")
     Windows.launching_app = app.plugin and app or nil
@@ -185,6 +193,7 @@ function AppRegistry:launch(app, opts)
     -- An app that didn't open an AppWindow must not leave the target armed.
     AppWindow.pending_target = nil
     Windows.launching_app = nil
+    if ok then Debugger.started(app.id) else Debugger.failed(app.id, err) end
     if not ok then
         logger.err("AppRegistry: failed to launch", app.id, err)
         UIManager:show(InfoMessage:new{

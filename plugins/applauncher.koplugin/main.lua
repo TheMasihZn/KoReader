@@ -113,7 +113,45 @@ function AppLauncher:init()
     if ok and not self.ui.document then
         FileHandlers:addFileDialogButton(self.ui)
     end
-    if not started_once and G_reader_settings:isTrue("applauncher_at_startup")
+    -- Closing a book lands on Home (once; the reader's own onHome is wrapped for everyone).
+    if not self.ui.document then
+        pcall(function()
+            local ReaderUI = require("apps/reader/readerui")
+            if not ReaderUI._kos_home_wrapped then
+                ReaderUI._kos_home_wrapped = true
+                local orig = ReaderUI.onHome
+                ReaderUI.onHome = function(reader, ...)
+                    local ret = orig(reader, ...)
+                    if G_reader_settings:nilOrTrue("kos_home_landing") then
+                        UIManager:nextTick(function()
+                            UIManager:broadcastEvent(require("ui/event"):new("ShowAppLauncher", { only_if_closed = true }))
+                        end)
+                    end
+                    return ret
+                end
+            end
+        end)
+    end
+    -- Debugger: layout bounds come back; was an app starting when KOReader last died?
+    if not started_once then
+        pcall(function()
+            local Debugger = require("apps/kos/debugger")
+            Debugger.restore()
+            local id, times = Debugger.checkLastStart()
+            if id then
+                local InfoMessage = require("ui/widget/infomessage")
+                local ConfirmBox = require("ui/widget/confirmbox")
+                UIManager:nextTick(function()
+                    UIManager:show(ConfirmBox:new{
+                        text = T(_("KOReader closed while \"%1\" was starting (%2 time(s)).\n\nSwitch that app off until you turn it on again?"), id, times),
+                        ok_text = _("Switch off"), cancel_text = _("Keep it on"),
+                        ok_callback = function() Debugger.setDisabled(id, true) end,
+                    })
+                end)
+            end
+        end)
+    end
+    if not started_once and G_reader_settings:nilOrTrue("applauncher_at_startup")
             and not self.ui.document then -- the file browser, not a book
         started_once = true
         UIManager:nextTick(function() self:onShowAppLauncher() end)
@@ -140,8 +178,71 @@ function AppLauncher:addToMainMenu(menu_items)
             },
             {
                 text = _("Open at startup"),
-                checked_func = function() return G_reader_settings:isTrue("applauncher_at_startup") end,
-                callback = function() G_reader_settings:flipNilOrFalse("applauncher_at_startup") end,
+                checked_func = function() return G_reader_settings:nilOrTrue("applauncher_at_startup") end,
+                callback = function() G_reader_settings:flipNilOrTrue("applauncher_at_startup") end,
+            },
+            {
+                text = _("Home after closing a book or app"),
+                help_text = _("Closing a book or the last app opens the Home screen instead of the file browser."),
+                checked_func = function() return G_reader_settings:nilOrTrue("kos_home_landing") end,
+                callback = function() G_reader_settings:flipNilOrTrue("kos_home_landing") end,
+            },
+            {
+                text = _("Debug"),
+                sub_item_table_func = function()
+                    local Debugger = require("apps/kos/debugger")
+                    local items = {
+                        {
+                            text = _("Show layout bounds"),
+                            help_text = _("Draws a thin box around every container, like Android's Show layout bounds. Colours: red frames, blue vertical groups, green horizontal groups, orange centred."),
+                            checked_func = function() return Debugger.boundsOn() end,
+                            callback = function() Debugger.setBounds(not Debugger.boundsOn()) end,
+                        },
+                        {
+                            text = _("Show debug trail"),
+                            help_text = _("Which app started, and which one was starting when KOReader closed. Opens in Logcat."),
+                            keep_menu_open = true,
+                            callback = function()
+                                UIManager:broadcastEvent(require("ui/event"):new("ShowLogcat", "debug"))
+                            end,
+                        },
+                    }
+                    for id in pairs(Debugger.disabledApps()) do
+                        items[#items + 1] = {
+                            text = T(_("Switch on again: %1"), id),
+                            callback = function() Debugger.setDisabled(id, false) end,
+                        }
+                    end
+                    return items
+                end,
+            },
+            {
+                text = _("Menu look"),
+                sub_item_table = {
+                    {
+                        text = _("Line strength"),
+                        sub_item_table = {
+                            { text = _("Faint"), radio = true, checked_func = function() return (G_reader_settings:readSetting("kos_flat_lines") or 2) == 1 end,
+                              callback = function() G_reader_settings:saveSetting("kos_flat_lines", 1) end },
+                            { text = _("Soft"), radio = true, checked_func = function() return (G_reader_settings:readSetting("kos_flat_lines") or 2) == 2 end,
+                              callback = function() G_reader_settings:saveSetting("kos_flat_lines", 2) end },
+                            { text = _("Clear"), radio = true, checked_func = function() return (G_reader_settings:readSetting("kos_flat_lines") or 2) == 3 end,
+                              callback = function() G_reader_settings:saveSetting("kos_flat_lines", 3) end },
+                        },
+                    },
+                    {
+                        text = _("Corners"),
+                        sub_item_table = {
+                            { text = _("Square"), radio = true, checked_func = function() return (G_reader_settings:readSetting("kos_flat_radius") or 1) == 0 end,
+                              callback = function() G_reader_settings:saveSetting("kos_flat_radius", 0) end },
+                            { text = _("Soft"), radio = true, checked_func = function() return (G_reader_settings:readSetting("kos_flat_radius") or 1) == 1 end,
+                              callback = function() G_reader_settings:saveSetting("kos_flat_radius", 1) end },
+                            { text = _("Round"), radio = true, checked_func = function() return (G_reader_settings:readSetting("kos_flat_radius") or 1) == 2 end,
+                              callback = function() G_reader_settings:saveSetting("kos_flat_radius", 2) end },
+                        },
+                    },
+                },
+                help_text = _("How strong the outlines of menus and dialogs are, and how round their corners. Restart KOReader to see the change."),
             },
             {
                 text = _("Flat design"),
@@ -193,6 +294,7 @@ function AppLauncher:onShowOpenWindows()
 end
 
 function AppLauncher:onShowAppLauncher(args)
+    if args and args.only_if_closed and self.window then return true end
     self.split_target = args and args.split or nil
     if self.window then
         UIManager:close(self.window)

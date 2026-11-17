@@ -177,6 +177,15 @@ function AppWindow:close(force)
         self.on_close(self)
         self.on_close = nil
     end
+    -- Closing the last app lands on Home, not on the file browser (setting kos_home_landing).
+    if self.in_switcher ~= false and not self._leaving_for_home
+            and G_reader_settings and G_reader_settings:nilOrTrue("kos_home_landing") then
+        UIManager:nextTick(function()
+            if #require("apps/kos/windows").list == 0 then
+                UIManager:broadcastEvent(Event:new("ShowAppLauncher", { only_if_closed = true }))
+            end
+        end)
+    end
 end
 
 -- However the window goes away (also UIManager:close), it leaves the window list.
@@ -191,6 +200,7 @@ end
 
 --- Close this window and show the app launcher.
 function AppWindow:goHome()
+    self._leaving_for_home = true
     if self.confirm_close then
         -- Don't lose unsaved work: ask first, go home only once closed.
         self.confirm_close(self, function()

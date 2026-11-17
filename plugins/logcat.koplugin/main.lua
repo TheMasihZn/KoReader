@@ -30,6 +30,7 @@ local SOURCES = {
     { id = "fork", text = _("Patch log") },
     { id = "crash", text = _("crash.log") },
     { id = "trace", text = _("Actions") },
+    { id = "debug", text = _("Debug") },
 }
 local LEVELS = { V = _("All"), I = "I+", W = "W+", E = "E" }
 local LEVEL_NEXT = { V = "I", I = "W", W = "E", E = "V" }
@@ -66,7 +67,7 @@ local function readSource(id)
         p:close()
         return lines
     end
-    local name = id == "fork" and "fork-preview.log" or id == "trace" and "kos-trace.log" or "crash.log"
+    local name = id == "fork" and "fork-preview.log" or id == "trace" and "kos-trace.log" or id == "debug" and "kos-debug.log" or "crash.log"
     local lines = readFile(DataStorage:getDataDir() .. "/" .. name)
     if not lines then return nil, name .. " " .. _("does not exist yet.") end
     return lines
@@ -88,7 +89,7 @@ function Logcat:build(window, width, height)
         }
     end
     local rows = {
-        { src_button(SOURCES[1]), src_button(SOURCES[2]), src_button(SOURCES[3]), src_button(SOURCES[4]) },
+        { src_button(SOURCES[1]), src_button(SOURCES[2]), src_button(SOURCES[3]), src_button(SOURCES[4]), src_button(SOURCES[5]) },
         {
             { text = _("Level: ") .. LEVELS[State.min_level], callback = function()
                 State.min_level = LEVEL_NEXT[State.min_level] State.back = 0 window:refresh() end },
@@ -142,7 +143,11 @@ function Logcat:launchApp()
     }
 end
 
-function Logcat:onShowLogcat() self:launchApp() return true end
+function Logcat:onShowLogcat(source)
+    if type(source) == "string" then State.source = source end
+    self:launchApp()
+    return true
+end
 
 function Logcat:addToMainMenu(menu_items)
     menu_items.kos_logcat = {
