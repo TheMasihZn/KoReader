@@ -297,3 +297,10 @@ simulations, and make the running decisions itself.
   asking, as the user's standing preference says.
 - Inside the OS this is the pipeline of section 15: the voice input is one more keyboard, the same runner
   contract (section 9) executes the steps.
+
+## 21. Home chat, input pipelines, canvas, settings map, IDE hand-off (built in 0.3.0)
+Home lists apps as plain lines; the input line sends text through a pipeline (`apps/kos/pipeline.lua`).
+Settings order by Shannon entropy as a stand-in for Framal Entropy: $H = -\sum_i p_i \log_2 p_i$ over observed
+values, $H = \log_2 n$ when nothing is observed. Canvas keeps items on an unbounded plane (`canvasmodel.lua`).
+Open in IDE builds an `am start -a android.intent.action.VIEW` command (`idehandoff.lua`). Bridge clients are
+registered and approved by the owner (`tools/gemmaBridge/registry.py`).

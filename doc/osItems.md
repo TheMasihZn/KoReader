@@ -38,10 +38,10 @@ Status: built, declared (written in `osEmbedding.md`, not built), or open.
 | 31 | 3D animation of the layered Lua idea | you | open, meaning unclear |
 | 32 | Hand files to IntelliJ or Android Studio | you | declared |
 | 33 | Bottom reading menu redesign | you | open |
-| 34 | Home canvas replaces Recents | you | open |
+| 34 | Home canvas replaces Recents | you | built as Canvas app (pan, notes, apps; depth stored, not drawn); not yet the Home |
 | 35 | Drag and drop for Home icons | you | open |
 | 36 | Telegram-style Claude app | you | open, needs API key or laptop choice |
-| 37 | Dotted file versions | you | declared in memory |
+| 37 | Dotted file versions | you | built (versions app, dotted copies, change log); UI beyond the app open |
 | 38 | GitHub backup per space | you | open |
 | 39 | Webcam and audio-video pipeline | you | open |
 | 40 | System keyboard | you | open, needs fork of the launcher |
@@ -66,15 +66,15 @@ Status: built, declared (written in `osEmbedding.md`, not built), or open.
 | 59 | A named app comes as itself or a recompiled free alternative | you | declared |
 | 60 | Transparency settings per app | ? | question 1 |
 | 61 | Remove temporal, spatial, energetical boilerplate | you | declared |
-| 62 | Settings grouped by time, space, energy; classic out of sight | you | declared |
-| 63 | Settings tree derived from entropy | you | declared |
+| 62 | Settings grouped by time, space, energy; classic out of sight | you | built (Settings app); classic menu reachable from its bottom button |
+| 63 | Settings tree derived from entropy | you | built (entropy order, tested); uses the stand-in, not Framal Entropy |
 | 64 | Simulation to feed cases into the tree | you | declared |
 | 65 | Snapshot file for unfinished discussions | you | built (0.2.0): Snapshots app |
 | 66 | Name the formula in every section that uses one | you | declared |
-| 67 | Home as a chat of plain message lines | you | declared |
+| 67 | Home as a chat of plain message lines | you | built (default Home view; grid is an option); device test open |
 | 68 | One input box always connected to every keyboard | you | declared |
 | 69 | Pipelines of AI or plain programs | you | declared |
-| 70 | Bots, Telegram first | you | declared |
+| 70 | Bots, Telegram first | you | built for Telegram (needs token); WhatsApp held back |
 | 71 | WhatsApp automation held back (ban risk) | me | declared |
 | 72 | Universal search, triggered by character count | you | built (0.2.0), not tested on device |
 | 73 | Search places: fixed system ones plus the user's | you | built (0.2.0) |
@@ -111,3 +111,7 @@ Status: built, declared (written in `osEmbedding.md`, not built), or open.
 2. Does the icon grid stay as an option next to the chat-style Home?
 3. In your example Documents sat inside Downloads. Intended nesting?
 4. Where do volume, brightness and contrast go in the new settings groups?
+
+## Added in 0.3.0
+- Bridge registry with permissions (new clients wait for approval), pipelines for the input box, Open in IDE.
+- Needs a device test: Home chat view, input line, Settings app, Canvas gestures, Open in IDE.

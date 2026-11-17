@@ -3,6 +3,17 @@
 One section per version. The release script copies the section matching `kos/VERSION` into the release notes.
 Write what changed in plain facts, one line each.
 
+## 0.3.0 (2026-11-17)
+- Home is now a chat of plain lines (name and one line of what it does) with an input line at the bottom; the icon
+  grid is kept under Home view. Typing on a connected keyboard opens the input line.
+- Input pipelines: first word picks one (`open gemma`, `bot hello`), otherwise it is a search. Telegram step needs
+  settings `kos_telegram_token` and `kos_telegram_chat`.
+- Settings app: Time, Space, Energy, entries ordered by entropy, search by any name, classic menu at the bottom.
+- Canvas app: endless page, drag to pan, hold to put a note or an app anywhere.
+- Open in IDE in the file menu (Android intent, package set by you).
+- File versions app: dotted copies and a change log per file.
+- Bridge registry: every client gets an id; new ones wait until approved (`python3 registry.py approve <id>`).
+
 ## 0.2.0 (2026-11-17)
 - Windows 11 style title bar on every app window: minimize (window stays in the switcher), maximize or
   restore (window shape), close. Panes in the split view keep their own bar. Setting `kos_win11_titlebar` off

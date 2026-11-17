@@ -29,6 +29,9 @@ APPS = [  # id, label, needs
     ("viewer3d", "3D viewer (STL, design scripts)", "bundle"),
     ("snapshot", "Snapshots (save where a discussion stands)", "bundle"),
     ("versions", "File versions (change log, dotted copies)", "bundle"),
+    ("settings", "Settings by Time, Space, Energy", "bundle"),
+    ("idehandoff", "Open in IDE (IntelliJ, Android Studio)", "bundle"),
+    ("canvas", "Canvas (endless page)", "bundle"),
 ]
 
 def read(rel):
