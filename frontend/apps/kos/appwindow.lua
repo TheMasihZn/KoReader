@@ -123,19 +123,46 @@ function AppWindow:_layout()
         self[1]:free()
         self[1] = nil
     end
-    self.title_bar = TitleBar:new{
-        width = width,
-        fullscreen = true,
-        with_bottom_line = true,
-        title = require("apps/kos/windows").displayTitle(self),
-        subtitle = self.subtitle,
-        left_icon = self.home_button and "home" or nil,
-        -- long-press Home: this window's menu (split view, new window, all windows)
-        left_icon_hold_callback = function() require("apps/kos/windows").windowMenu(self) end,
-        left_icon_tap_callback = self.home_button and function() self:goHome() end or nil,
-        close_callback = function() self:close() end,
-        show_parent = self,
-    }
+    local Windows = require("apps/kos/windows")
+    local use_win11 = true
+    if G_reader_settings and G_reader_settings:readSetting("kos_win11_titlebar") == false then use_win11 = false end
+    if use_win11 then
+        local ok, bar = pcall(function()
+            return require("apps/kos/wintitlebar"):new{
+                width = width,
+                title = Windows.displayTitle(self),
+                subtitle = self.subtitle,
+                home = self.home_button and true or false,
+                on_home = function() self:goHome() end,
+                on_home_hold = function() Windows.windowMenu(self) end,
+                on_minimize = function() Windows.minimize(self) end,
+                on_maximize = function() self:toggleMaximize() end,
+                on_close = function() self:close() end,
+                maximized = not (self.ratio and self.ratio > 0),
+                show_parent = self,
+            }
+        end)
+        if ok then
+            self.title_bar = bar
+        else
+            logger.err("AppWindow: Windows 11 title bar failed, using the classic one:", bar)
+        end
+    end
+    if not self.title_bar then
+        self.title_bar = TitleBar:new{
+            width = width,
+            fullscreen = true,
+            with_bottom_line = true,
+            title = Windows.displayTitle(self),
+            subtitle = self.subtitle,
+            left_icon = self.home_button and "home" or nil,
+            -- long-press Home: this window's menu (split view, new window, all windows)
+            left_icon_hold_callback = function() Windows.windowMenu(self) end,
+            left_icon_tap_callback = self.home_button and function() self:goHome() end or nil,
+            close_callback = function() self:close() end,
+            show_parent = self,
+        }
+    end
     local content_height = height - self.title_bar:getHeight()
     local content
     local content_w = contentWidth(width, self.max_content_dp)
@@ -227,7 +254,26 @@ end
 
 -- However the window goes away (also UIManager:close), it leaves the window list.
 function AppWindow:onCloseWidget()
+    if self._keep_in_list then -- minimized: off the screen, still in the window list
+        self._keep_in_list = nil
+        return
+    end
     require("apps/kos/windows").remove(self)
+end
+
+--- Maximize or restore. A shaped window (see Window shape…) goes full screen and remembers its shape;
+-- a full-screen window goes back to the remembered shape, or opens the shape menu when there is none.
+function AppWindow:toggleMaximize()
+    if self.ratio and self.ratio > 0 then
+        self._restore_ratio = self.ratio
+        self:setRatio(nil)
+    elseif self._restore_ratio then
+        local r = self._restore_ratio
+        self._restore_ratio = nil
+        self:setRatio(r)
+    else
+        require("apps/kos/windows").shapeMenu(self.kos_app and self.kos_app.id, self)
+    end
 end
 
 function AppWindow:onClose()
