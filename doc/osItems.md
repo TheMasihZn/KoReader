@@ -94,6 +94,12 @@ Status: built, declared (written in `osEmbedding.md`, not built), or open.
 | 87 | Mesh checks for printing: volume, weight by material, closed shape, overhang | me | built (0.2.0) |
 | 88 | Installer script for the laptop side | you | built (0.2.0) |
 | 89 | Git branch per feature: kosTitleBar, kosSearch, kosViewer3d, kosSnapshot | you | done |
+| 90 | HTML report for people and LLMs | you | built (tools/kosBundle/make_report.py) |
+| 91 | Debug session: breakpoints, snapshots, call profile, log | you | built, tested headless; device test open |
+| 92 | ADB wrapper in the shell | you | built, tested with a fake adb; device test open |
+| 93 | ADB daemon inside the OS image | you | declared (OS layer) |
+| 94 | Debugger front end on the laptop (breakpoints, stepping through the bridge) | me | declared |
+| 95 | Layout inspector like Android Studio | me | declared |
 
 ## Still not built, and why
 - Needs your decision: chat-style Home and the always-on input box (grid kept as option?), settings groups

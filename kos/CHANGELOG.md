@@ -3,6 +3,12 @@
 One section per version. The release script copies the section matching `kos/VERSION` into the release notes.
 Write what changed in plain facts, one line each.
 
+## 0.4.0 (2026-11-17)
+- Debug session: breakpoints with conditions, snapshots of the variables, post-mortem on errors, most-called
+  functions, timing spans, a log file. Debugger app with report, breakpoints and ADB devices.
+- ADB wrapper: devices, connect, shell, logcat, install, push, pull (needs an `adb` program).
+- HTML report of the whole ledger, for people in a browser and for LLMs (`report.html` in the release).
+
 ## 0.3.0 (2026-11-17)
 - Home is now a chat of plain lines (name and one line of what it does) with an input line at the bottom; the icon
   grid is kept under Home view. Typing on a connected keyboard opens the input line.

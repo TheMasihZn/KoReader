@@ -97,6 +97,8 @@ def main():
         apps=apps, checksums=checksums, commit=commit)
     with open(os.path.join(DIST, "RELEASE.md"), "w", encoding="utf-8") as f:
         f.write(notes)
+    import subprocess
+    subprocess.check_call([sys.executable, os.path.join(ROOT, "tools/kosBundle/make_report.py"), os.path.join(DIST, "report.html")])
     print("built KOReader OS %s into %s (%d files)" % (version, DIST, len(files) + 1))
 
 main()
