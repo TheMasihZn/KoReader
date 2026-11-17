@@ -62,3 +62,22 @@ Home canvas replacing Recents · bottom reading menu redesign · dotted file ver
 per-space GitHub backup · webcam/audio-video pipeline across devices · system keyboard (needs a fork of
 android-luajit-launcher) · local model wired to `inputlayer` · file hand-off to IntelliJ / Android Studio
 (Android intent, user-chosen IDE) · 3D animation of the layered Lua idea.
+
+## 6. OS layer, not Lua (asked for, to be designed in the OS chat)
+
+**Software GPU driver.** One driver that looks like a real GPU to everything above it, same calls, same
+ports, same rules, only slower because the work runs on the CPU (and "neural" units: the same idea for
+an NPU). This sits below KOReader, in the kernel and graphics stack, so the shell only needs to *use* it.
+Existing parts to build on instead of starting from zero:
+
+| API the apps call | CPU implementation that already exists |
+| --- | --- |
+| OpenGL, OpenGL ES | Mesa llvmpipe |
+| Vulkan | Mesa lavapipe, SwiftShader |
+| OpenCL (compute) | pocl |
+| Neural networks (NPU/NNAPI) | ONNX Runtime or XNNPACK on CPU |
+| Kernel side (a device node that looks like a GPU) | a DRM/KMS virtual device (vkms or virtio-gpu style) |
+
+What the shell needs from the OS: a way to ask "which GPUs are there" that also lists this one, and the
+same device node and socket names as a real GPU. Open choice for the OS chat: build on Mesa and SwiftShader
+(fast to get working) or write a new driver (full control, much more work).
