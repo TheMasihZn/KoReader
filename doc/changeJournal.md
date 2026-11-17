@@ -5,3 +5,4 @@ One line per step: when, commit, what, branch. Written by tools/kosBundle/journa
 - 2026-11-17 `5ddd9dc` restore point kosRestoreBeforeNine: state before the nine-piece run (0.4.0)
 - 2026-11-17T09:36Z `5ddd9dc` journal and restore points added (branch kosNine)
 - 2026-11-17T09:45Z `034819a` simulation harness: 21 bundled plugins load and open headless (branch kosNine)
+- 2026-11-17T09:47Z `16d56ea` REST router, Telegram bot, HTTP adapter, routes view in Studio, REST plugin (branch kosNine)

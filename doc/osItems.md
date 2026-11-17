@@ -121,3 +121,17 @@ Status: built, declared (written in `osEmbedding.md`, not built), or open.
 ## Added in 0.3.0
 - Bridge registry with permissions (new clients wait for approval), pipelines for the input box, Open in IDE.
 - Needs a device test: Home chat view, input line, Settings app, Canvas gestures, Open in IDE.
+
+## Added in the nine-piece run (0.5.0)
+| # | Item | From | Status |
+| --- | --- | --- | --- |
+| 96 | Simulation harness (fake KOReader, 21+ plugins open headless) | you | built |
+| 97 | Telegram bot to REST pipeline (device polls, nothing open to the internet) | you | built, needs a bot token |
+| 98 | REST router with GET/PUT/POST/DELETE, routes added on the fly, approval on the screen | you | built |
+| 99 | REST routes listed in Studio | you | built |
+| 100 | HTTP front on this phone (127.0.0.1) | you | built, untested on device |
+| 101 | Virtual adapter chain for input and output devices, with perturbations | you | in progress |
+| 102 | Link library in C for ESP32 and ATmega (to go into the embedded studio) | you | in progress |
+| 103 | Embedded studio | you | declared |
+| 104 | Voice commands reach every app and route | you | declared (needs voice session with tools) |
+| 105 | Top-level LLM with autonomy in the sandbox | you | declared with guardrails, see osEmbedding.md 23 |

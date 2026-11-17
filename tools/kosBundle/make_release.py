@@ -33,6 +33,7 @@ APPS = [  # id, label, needs
     ("idehandoff", "Open in IDE (IntelliJ, Android Studio)", "bundle"),
     ("canvas", "Canvas (endless page)", "bundle"),
     ("debugger", "Debugger (session, breakpoints, ADB)", "bundle"),
+    ("restbot", "REST and bot (Telegram and HTTP to REST calls)", "bundle"),
 ]
 
 def read(rel):

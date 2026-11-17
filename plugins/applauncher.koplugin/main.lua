@@ -444,6 +444,19 @@ local function openCount(app)
 end
 
 --- Tap on Home: opens the app, or, while moving one, drops the moved app before this one.
+--- Event KosOpenApp (from REST calls, voice, pipelines): open an app by id or name.
+function AppLauncher:onKosOpenApp(name)
+    local want = tostring(name):lower()
+    for _i, a in ipairs(AppRegistry:getApps()) do
+        if a.id == name or a.title:lower() == want then
+            self.moving = nil
+            self:launch(a)
+            return true
+        end
+    end
+    return false
+end
+
 function AppLauncher:tapApp(app, window)
     local moving = self.moving
     if not moving then

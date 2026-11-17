@@ -191,6 +191,10 @@ function Studio:projectListItems()
         {
             text = Device:isAndroid() and _("Logs (Android & crash.log)") or _("View log"),
             callback = function() self:showLogMenu() end,
+        },
+        {
+            text = _("REST routes"),
+            callback = function() require("apps/kos/routesview").show() end,
             separator = true,
         },
     }
