@@ -26,6 +26,7 @@ APPS = [  # id, label, needs
     ("preview", "Preview (thumbnails)", "bundle"),
     ("pendulums", "Pendulums", "bundle"),
     ("lightlab", "Light lab (double slit)", "bundle"),
+    ("viewer3d", "3D viewer (STL, design scripts)", "bundle"),
 ]
 
 def read(rel):
