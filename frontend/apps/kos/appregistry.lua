@@ -146,7 +146,63 @@ function AppRegistry:getApps()
         if a.order ~= b.order then return a.order < b.order end
         return tostring(a.title) < tostring(b.title)
     end)
-    return apps
+    return AppRegistry.arrange(apps, AppRegistry.userOrder(), AppRegistry.sortMode())
+end
+
+--- Home order chosen by the user: list of app ids. Setting kos_home_order.
+function AppRegistry.userOrder()
+    return G_reader_settings and G_reader_settings:readSetting("kos_home_order") or {}
+end
+
+--- "custom" (default; the saved order, new apps at the end), "az", or "default" (built-in order).
+function AppRegistry.sortMode()
+    return G_reader_settings and G_reader_settings:readSetting("kos_home_sort") or "custom"
+end
+
+--- Pure: returns `apps` arranged by mode. Apps missing from `order` keep their default place after the listed ones.
+function AppRegistry.arrange(apps, order, mode)
+    if mode == "default" then return apps end
+    if mode == "az" then
+        local copy = {}
+        for i, app in ipairs(apps) do copy[i] = app end
+        table.sort(copy, function(a, b) return tostring(a.title):lower() < tostring(b.title):lower() end)
+        return copy
+    end
+    if not order or #order == 0 then return apps end
+    local rank = {}
+    for i, id in ipairs(order) do rank[id] = i end
+    local listed, rest = {}, {}
+    for _i, app in ipairs(apps) do
+        if rank[app.id] then listed[#listed + 1] = app else rest[#rest + 1] = app end
+    end
+    table.sort(listed, function(a, b) return rank[a.id] < rank[b.id] end)
+    for _i, app in ipairs(rest) do listed[#listed + 1] = app end
+    return listed
+end
+
+--- Pure: new id list with `id` moved before `before_id` (nil = to the end). `ids` = ids as shown now.
+function AppRegistry.move(ids, id, before_id)
+    local out = {}
+    for _i, v in ipairs(ids) do
+        if v ~= id then out[#out + 1] = v end
+    end
+    local pos = #out + 1
+    if before_id then
+        for i, v in ipairs(out) do
+            if v == before_id then pos = i break end
+        end
+    end
+    table.insert(out, pos, id)
+    return out
+end
+
+--- Moves an app on Home and saves the whole shown order (so it survives new plugins).
+function AppRegistry:moveApp(id, before_id)
+    local ids = {}
+    for _i, app in ipairs(self:getApps()) do ids[#ids + 1] = app.id end
+    G_reader_settings:saveSetting("kos_home_order", AppRegistry.move(ids, id, before_id))
+    G_reader_settings:saveSetting("kos_home_sort", "custom")
+    G_reader_settings:flush()
 end
 
 --- Can this app run in a split-view window? (Only apps that open an AppWindow.)

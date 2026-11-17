@@ -188,6 +188,44 @@ function AppLauncher:addToMainMenu(menu_items)
                 callback = function() G_reader_settings:flipNilOrTrue("kos_home_landing") end,
             },
             {
+                text = _("Home layout"),
+                sub_item_table = {
+                    { text = _("Order: my order (hold an icon, then Move)"), radio = true,
+                      checked_func = function() return AppRegistry.sortMode() == "custom" end,
+                      callback = function() G_reader_settings:saveSetting("kos_home_sort", "custom") end },
+                    { text = _("Order: A to Z (like One UI's app drawer)"), radio = true,
+                      checked_func = function() return AppRegistry.sortMode() == "az" end,
+                      callback = function() G_reader_settings:saveSetting("kos_home_sort", "az") end },
+                    { text = _("Order: built-in"), radio = true,
+                      checked_func = function() return AppRegistry.sortMode() == "default" end,
+                      callback = function() G_reader_settings:saveSetting("kos_home_sort", "default") end },
+                    { text = _("Forget my order"), keep_menu_open = true,
+                      callback = function()
+                          G_reader_settings:delSetting("kos_home_order")
+                          G_reader_settings:saveSetting("kos_home_sort", "default")
+                          UIManager:show(InfoMessage:new{ text = _("Home order reset."), timeout = 2 })
+                      end },
+                    { text = _("Columns"), sub_item_table = (function()
+                        local items = {}
+                        for _i, n in ipairs({ 0, 3, 4, 5, 6 }) do
+                            items[#items + 1] = { text = n == 0 and _("Automatic") or tostring(n), radio = true,
+                                checked_func = function() return (G_reader_settings:readSetting("kos_home_cols") or 0) == n end,
+                                callback = function() G_reader_settings:saveSetting("kos_home_cols", n) end }
+                        end
+                        return items
+                    end)() },
+                    { text = _("Icon size"), sub_item_table = {
+                        { text = _("Small"), radio = true, checked_func = function() return G_reader_settings:readSetting("kos_home_icon") == "small" end,
+                          callback = function() G_reader_settings:saveSetting("kos_home_icon", "small") end },
+                        { text = _("Medium"), radio = true, checked_func = function() return (G_reader_settings:readSetting("kos_home_icon") or "medium") == "medium" end,
+                          callback = function() G_reader_settings:saveSetting("kos_home_icon", "medium") end },
+                        { text = _("Large"), radio = true, checked_func = function() return G_reader_settings:readSetting("kos_home_icon") == "large" end,
+                          callback = function() G_reader_settings:saveSetting("kos_home_icon", "large") end },
+                    } },
+                },
+                help_text = _("Hold an icon on Home and choose Move, then tap where it should go. Columns and icon size show next time Home opens."),
+            },
+            {
                 text = _("Debug"),
                 sub_item_table_func = function()
                     local Debugger = require("apps/kos/debugger")
@@ -343,7 +381,20 @@ local function openCount(app)
     return n
 end
 
-function AppLauncher:showAppMenu(app)
+--- Tap on Home: opens the app, or, while moving one, drops the moved app before this one.
+function AppLauncher:tapApp(app, window)
+    local moving = self.moving
+    if not moving then
+        self:launch(app)
+        return
+    end
+    self.moving = nil
+    if moving ~= app.id then AppRegistry:moveApp(moving, app.id) end
+    self.window:setTitle(clockText(), dateText())
+    window:refresh()
+end
+
+function AppLauncher:showAppMenu(app, window)
     local dialog
     local can_split = AppRegistry:canSplit(app)
     dialog = ButtonDialog:new{
@@ -358,6 +409,24 @@ function AppLauncher:showAppMenu(app)
                     UIManager:close(dialog)
                     if self.window then self.window:close() end
                     UIManager:nextTick(function() require("apps/kos/windows").showSwitcher() end)
+                end },
+            },
+            {
+                { text = _("Move…"), callback = function()
+                    UIManager:close(dialog)
+                    self.moving = app.id
+                    self.window:setTitle(clockText(), T(_("Moving %1: tap where it goes (tap it again to cancel)"), app.title))
+                end },
+                { text = _("To the start"), callback = function()
+                    UIManager:close(dialog)
+                    local first = AppRegistry:getApps()[1]
+                    if first and first.id ~= app.id then AppRegistry:moveApp(app.id, first.id) end
+                    if window then window:refresh() end
+                end },
+                { text = _("To the end"), callback = function()
+                    UIManager:close(dialog)
+                    AppRegistry:moveApp(app.id, nil)
+                    if window then window:refresh() end
                 end },
             },
             {
@@ -380,17 +449,19 @@ function AppLauncher:buildGrid(window, width, height)
     local margin = Size.padding.fullscreen
     local inner_w = width - 2 * margin
     local min_tile_w = Screen:scaleBySize(112) -- room for names
-    local cols = math.max(3, math.floor(inner_w / min_tile_w))
+    local cols = G_reader_settings:readSetting("kos_home_cols")
+    if not cols or cols < 2 then cols = math.max(3, math.floor(inner_w / min_tile_w)) end
     local tile_w = math.floor(inner_w / cols)
-    local icon_size = math.min(Screen:scaleBySize(36), math.floor(tile_w / 2))
+    local size_dp = ({ small = 28, medium = 36, large = 48 })[G_reader_settings:readSetting("kos_home_icon") or "medium"] or 36
+    local icon_size = math.min(Screen:scaleBySize(size_dp), math.floor(tile_w / 2))
 
     local make_tile = function(app)
         return AppTile:new{
             app = app,
             width = tile_w,
             icon_size = icon_size,
-            callback = function(a) self:launch(a) end,
-            hold_callback = function(a) self:showAppMenu(a) end,
+            callback = function(a) self:tapApp(a, window) end,
+            hold_callback = function(a) self:showAppMenu(a, window) end,
         }
     end
 
