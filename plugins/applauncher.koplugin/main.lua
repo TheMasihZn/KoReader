@@ -147,6 +147,7 @@ local started_once = false
 
 function AppLauncher:init()
     require("apps/kos/flatstyle").install()
+    pcall(function() require("apps/kos/gestureforward").installMenus() end)
     self:onDispatcherRegisterActions()
     self.ui.menu:registerToMainMenu(self)
     -- "Open with…" in the long-press menu of files that apps can open.

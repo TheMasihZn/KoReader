@@ -82,4 +82,23 @@ function GestureForward.handle(widget, event, inner)
     return false
 end
 
+--- Full-screen menus (Collections, History, Favorites, ...) cover the screen like an app window does, so the gesture
+-- zones of the file browser underneath never saw touches while one was open. This makes every full-screen Menu forward
+-- your assigned gestures the same way an app window does. Setting kos_menu_gestures (default on) turns it off.
+-- Departure from stock KOReader: a hold or swipe that you assigned to an action now also fires inside those menus.
+function GestureForward.installMenus(Menu)
+    Menu = Menu or require("ui/widget/menu")
+    if Menu._kos_gesture_patch then return false end
+    Menu._kos_gesture_patch = true
+    local original = Menu.handleEvent
+    Menu.handleEvent = function(self, event)
+        local on = G_reader_settings == nil or G_reader_settings:readSetting("kos_menu_gestures") ~= false
+        if on and self.covers_fullscreen then
+            return GestureForward.handle(self, event, original)
+        end
+        return original(self, event)
+    end
+    return true
+end
+
 return GestureForward
