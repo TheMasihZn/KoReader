@@ -43,7 +43,8 @@ if os.path.isdir(_OLD_DIR) and not os.path.exists(APP_DIR):
 SESSIONS_DIR = os.path.join(APP_DIR, "sessions")
 CONFIG_FILE = os.path.join(APP_DIR, "config.json")
 AUDIO_DIR = os.path.join(APP_DIR, "audio")
-import fileshare  # noqa: E402  (same folder)
+import fileshare
+import registry as registry_mod  # noqa: E402  (same folder)
 
 DISCOVERY_PORT = 47801
 DISCOVERY_ASK = b"GEMMA-BRIDGE?"
@@ -315,8 +316,9 @@ class Speech:
 # HTTP API (+ the laptop's chat page)
 # --------------------------------------------------------------------------
 
-def make_handler(store, gen, ollama, cfg, speech):
+def make_handler(store, gen, ollama, cfg, speech, reg=None):
     share_root = fileshare.share_root(cfg)
+    reg = reg or registry_mod.Registry()
     class Handler(BaseHTTPRequestHandler):
         server_version = "GemmaBridge/1"
 
@@ -324,7 +326,19 @@ def make_handler(store, gen, ollama, cfg, speech):
             pass
 
         def _local(self):
+            if os.environ.get("KOS_BRIDGE_TEST_REMOTE"):  # tests only: treat localhost as a phone
+                return False
             return self.client_address[0] in ("127.0.0.1", "::1")
+
+        def _allowed(self, scope):
+            """The PIN is checked first (_authorized); then the registry decides what this client may do."""
+            if self._local():
+                return True
+            client = self.headers.get("X-Bridge-Client") or ("unnamed@" + self.client_address[0])
+            ok, reason = reg.check(client, self.client_address[0], scope)
+            if not ok:
+                self._json(403, {"error": reason, "client": client})
+            return ok
 
         def _authorized(self):
             if self._local():
@@ -358,10 +372,16 @@ def make_handler(store, gen, ollama, cfg, speech):
                 return
             if not self._authorized():
                 return self._json(401, {"error": "wrong or missing PIN"})
+            if u.path == "/api/registry":
+                if not self._local():
+                    return self._json(403, {"error": "the registry can only be read on the laptop"})
+                return self._json(200, reg.listing())
             if u.path == "/api/info":
+                if not self._allowed("info"): return
                 return self._json(200, {"name": socket.gethostname(), "model": ollama.pick_model(),
                                         "speech": speech.engine, "sessions": store.summary()})
             if u.path.startswith("/api/audio/"):
+                if not self._allowed("audio"): return
                 # /api/audio/<session>/<message id>.wav : the message read aloud (cached)
                 bits = u.path[len("/api/audio/"):].split("/")
                 text = None
@@ -389,11 +409,13 @@ def make_handler(store, gen, ollama, cfg, speech):
                 self.wfile.write(body)
                 return
             if u.path == "/api/files":
+                if not self._allowed("files.read"): return
                 items = fileshare.listing(share_root, (q.get("path") or [""])[0])
                 if items is None:
                     return self._json(404, {"error": "no such folder"})
                 return self._json(200, {"path": (q.get("path") or [""])[0], "items": items})
             if u.path == "/api/files/get":
+                if not self._allowed("files.read"): return
                 full = fileshare.safe_path(share_root, (q.get("path") or [""])[0])
                 if full is None or not os.path.isfile(full):
                     return self._json(404, {"error": "no such file"})
@@ -410,9 +432,11 @@ def make_handler(store, gen, ollama, cfg, speech):
                         self.wfile.write(chunk)
                 return
             if u.path == "/api/sessions":
+                if not self._allowed("chat"): return
                 return self._json(200, store.summary())
             parts = u.path.strip("/").split("/")
             if len(parts) == 4 and parts[:2] == ["api", "sessions"] and parts[3] == "messages":
+                if not self._allowed("chat"): return
                 since = int((q.get("since") or ["0"])[0])
                 wait = float((q.get("wait") or ["0"])[0])
                 res = store.changes(parts[2], since, wait)
@@ -425,6 +449,7 @@ def make_handler(store, gen, ollama, cfg, speech):
             if not self._authorized():
                 return self._json(401, {"error": "wrong or missing PIN"})
             if u.path == "/api/files/put":
+                if not self._allowed("files.write"): return
                 n = int(self.headers.get("Content-Length") or -1)
                 ok, msg = fileshare.save_upload(share_root, (q.get("path") or [""])[0], self.rfile, n)
                 return self._json(200 if ok else 400, {"ok": ok, "message": msg})
@@ -439,9 +464,11 @@ def make_handler(store, gen, ollama, cfg, speech):
             except ValueError:
                 return self._json(400, {"error": "bad JSON"})
             if u.path == "/api/sessions":
+                if not self._allowed("chat"): return
                 return self._json(200, store.create(data.get("title") or "Chat"))
             parts = u.path.strip("/").split("/")
             if len(parts) == 4 and parts[:2] == ["api", "sessions"] and parts[3] == "messages":
+                if not self._allowed("chat"): return
                 sid = parts[2]
                 if sid not in store.sessions:
                     return self._json(404, {"error": "no such session"})
@@ -552,6 +579,10 @@ def main():
     print(f"  Laptop:  http://localhost:{args.port}")
     print(f"  Phone:   open the Gemma app in KOReader. Address {ip}:{args.port}, PIN {cfg['pin']}")
     print(f"  Shared folder: {fileshare.share_root(cfg)}  (files you send from the phone land here)")
+    pend = registry_mod.Registry().pending()
+    if pend:
+        print("  Waiting for your approval: " + ", ".join(pend) + "   (python3 registry.py approve <id>)")
+    print("  Registry and access log: ~/.gemmaBridge/registry.json, access.log. List: python3 registry.py list")
     print("  Stop with Ctrl+C. Conversations are kept in ~/.gemmaBridge/")
     try:
         server.serve_forever()

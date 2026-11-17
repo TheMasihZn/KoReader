@@ -120,11 +120,10 @@ local function request(method, path, body)
     local code = socket.skip(1, http.request{
         url = string.format("http://%s:%s%s", host, port, path),
         method = method,
-        headers = {
-            ["X-Bridge-Pin"] = pin or "",
+        headers = require("apps/kos/bridgeid").headers(pin, {
             ["Content-Type"] = payload and "application/json" or nil,
             ["Content-Length"] = payload and tostring(#payload) or nil,
-        },
+        }),
         source = payload and ltn12.source.string(payload) or nil,
         sink = ltn12.sink.table(sink),
     })
@@ -132,6 +131,7 @@ local function request(method, path, body)
     if code ~= 200 then
         local err = tostring(code)
         if code == 401 then err = _("wrong PIN") end
+        if code == 403 then err = require("apps/kos/bridgeid").explain(403, table.concat(sink)) end
         return nil, err
     end
     local ok, data = pcall(JSON.decode, table.concat(sink))

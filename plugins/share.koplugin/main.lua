@@ -40,11 +40,12 @@ local function getJSON(path)
     local sink = {}
     socketutil:set_timeout(3, 8)
     local code = socket.skip(1, http.request{
-        url = url(path), method = "GET", headers = { ["X-Bridge-Pin"] = pin or "" },
+        url = url(path), method = "GET", headers = require("apps/kos/bridgeid").headers(pin),
         sink = ltn12.sink.table(sink),
     })
     socketutil:reset_timeout()
-    if code == 401 then return nil, _("Wrong PIN.") end
+    local why = require("apps/kos/bridgeid").explain(code, table.concat(sink))
+    if why then return nil, why end
     if code ~= 200 then return nil, T(_("The laptop did not answer (%1)."), tostring(code)) end
     local ok, data = pcall(require("json").decode, table.concat(sink))
     if not ok then return nil, _("Unreadable answer from the laptop.") end
@@ -61,7 +62,7 @@ function Share.download(rel, dest)
     socketutil:set_timeout(5, 600)
     local code = socket.skip(1, http.request{
         url = url("/api/files/get?path=" .. U.encode(rel)), method = "GET",
-        headers = { ["X-Bridge-Pin"] = pin or "" }, sink = ltn12.sink.file(f),
+        headers = require("apps/kos/bridgeid").headers(pin), sink = ltn12.sink.file(f),
     })
     socketutil:reset_timeout()
     if code ~= 200 then os.remove(part) return false, T(_("Download failed (%1)."), tostring(code)) end
@@ -82,7 +83,7 @@ function Share.upload(file, rel)
     socketutil:set_timeout(5, 600)
     local code = socket.skip(1, http.request{
         url = url("/api/files/put?path=" .. U.encode(rel)), method = "PUT",
-        headers = { ["X-Bridge-Pin"] = pin or "", ["Content-Length"] = tostring(size) },
+        headers = require("apps/kos/bridgeid").headers(pin, { ["Content-Length"] = tostring(size) }),
         source = ltn12.source.file(f), sink = ltn12.sink.table(sink),
     })
     socketutil:reset_timeout()
