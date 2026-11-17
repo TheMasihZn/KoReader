@@ -14,6 +14,7 @@ AppWindow and Workspace call add/remove themselves; apps do nothing.
 ]]
 
 local ButtonDialog = require("ui/widget/buttondialog")
+local Event = require("ui/event")
 local InfoMessage = require("ui/widget/infomessage")
 local UIManager = require("ui/uimanager")
 local logger = require("logger")
@@ -78,8 +79,26 @@ local function raiseWidget(widget)
     return false
 end
 
+--- Takes a window off the screen but keeps it in the window list, then shows the app launcher.
+-- Bring it back from the window switcher (Windows.raise).
+function Windows.minimize(win)
+    if isPane(win) or win._minimized then return end
+    win._minimized = true
+    win._keep_in_list = true
+    UIManager:close(win)
+    UIManager:nextTick(function()
+        UIManager:broadcastEvent(Event:new("ShowAppLauncher"))
+    end)
+end
+
 --- Brings a window to the front (and focuses it, in the split view).
 function Windows.raise(win)
+    if win._minimized then
+        win._minimized = nil
+        UIManager:show(win)
+        UIManager:setDirty(win, "full")
+        return
+    end
     if isPane(win) then
         local ws = win.workspace
         ws.focused = win
@@ -225,7 +244,7 @@ function Windows.showSwitcher()
             local w = Windows.list[i]
             table.insert(t, {
                 text = Windows.displayTitle(w),
-                mandatory = isPane(w) and _("split view") or _("full screen"),
+                mandatory = w._minimized and _("minimized") or (isPane(w) and _("split view") or _("full screen")),
                 win = w,
             })
         end
