@@ -23,6 +23,7 @@ a structure or common library is added. Source: `frontend/apps/kos/`, `plugins/`
 | `debugger` | Start-up trail (`kos-debug.log`), crash detection with "switch app off", layout bounds overlay. | Per-app crash note and a debug overlay in the compositor. |
 | `common` | `needs` and "under development" notices. **Rule: nothing is added without the owner's say-so.** | Shared app-requirements check (device, driver, network). |
 | `latexart` | Scenes (line, circle, rect, dot, path, text) as LaTeX art: `tikz(scene)` real TikZ source, `paint(scene, bb, …)` pixels, `unicode(tex)` formula as text. | A vector scene format and a renderer for a virtual display. |
+| `simwindow` | Simulation window: LaTeX-art picture, the formulas of this frame, Play/Step/Reset/Parameters/LaTeX source (saves the frame as .tex). A frame = one step. | Frame loop with a per-frame record. |
 | `physlab` | `pendulum` (N pendulums, exact equations, RK4, energy check, per-frame formulas) and `slits` (one or two slits, photons landing by chance, histogram entropy, per-frame formulas). | A simulation step API: state, step, per-frame record. |
 | `thumbs` | On-demand thumbnails in one cache (`cache/kos-thumbs`, cap `kos_thumb_cache_mb`, oldest first). | Shared thumbnail service with a size cap shown honestly. |
 
@@ -30,7 +31,7 @@ a structure or common library is added. Source: `frontend/apps/kos/`, `plugins/`
 
 Continue, Files, History, Favorites, Collections, Search, Dictionary, Wikipedia, Audio, Windows,
 Settings (built in) · Gemma, Share, Updates, Icons, Logcat, Studio, Sheets, LaTeX view, Focus,
-Preview (plugins) · Pendulums and Light lab (in progress).
+Preview, Pendulums, Light lab (plugins).
 
 ## 3. Files and settings the shell writes
 
