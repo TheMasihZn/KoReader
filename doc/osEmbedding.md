@@ -135,23 +135,60 @@ the consciousness work (a model trained on inputs the user picked, with a contin
 - Not decided: which archives are still available, their sizes, and the model to train. Next step is a search for
   these, then a size and licence list.
 
-## 9. Internal runner in Kotlin (declared, not built)
+## 9. Runner and bridge contract (declared, not built; replaces the Termux and Kotlin-engine ideas)
 
-Goal from the user: a modern internal runner, an embeddable engine written in Kotlin, able to run command-line
-apps inside the shell. If it cannot live in this repo, it gets its own repository; for now it is only listed.
+Termux is out of the project. Command-line apps run in the shell's own windowed terminal (Windows Terminal style),
+an app window like any other.
 
-Why it cannot be built here: KOReader runs on LuaJIT. There is no JVM inside it, and Kotlin needs a JVM
-or a native build. On Android the app is a native shell, so a JVM is not available to the Lua side either.
+- One contract. Lua apps call one API: run a command, open a file, read a sensor, use a device. They never know
+  what is behind it. The contract is socket based, so any language can sit behind it.
+- Providers by platform. Android: a Kotlin companion app with full Java access (also where an IDE hand-off to
+  IntelliJ or Android Studio goes, through an intent). Linux PC: a small native service, or a JVM if installed.
+  Kindle and other small Linux devices: a native provider, Java absent.
+- Honest limits. A device reports what its provider supports (the capability list from section 7). An app that
+  needs Java shows "needs Java" through the common library `common.lua` instead of failing.
+- Every call is logged in the `inputlayer` trace format (`kosTrace.log`).
+- Today: Lua starts programs with `io.popen`; Studio shows the output. That stays until a provider exists.
 
-Options for the OS chat (pick one):
-1. Separate process. A Kotlin/Native binary (no JVM) that the shell starts and talks to over a local
-   socket or stdin and stdout. Runs CLI apps, returns output to a shell window. Smallest change.
-2. Embedded JVM. A light JVM bundled next to the shell and started on demand. Heavier; fits the user's earlier
-   "app with a light JDK" idea.
-3. New repository, `kosRunner`, holding the Kotlin engine on its own, with this repo only calling it.
+## 10. Stack order (declared, not built)
 
-What exists today for CLI apps: Lua can start any program with `io.popen`, and Studio shows its output. The
-runner would add what that lacks: working directory per app, environment, input, stop and timeout, and the
-same trace format as `inputlayer` (`kosTrace.log`).
+Opposite of today's Android: not Android, then Java, then an APK with a Lua engine inside it.
+The target is the Lua engine directly on the OS, with the shell and our apps on top of it.
 
-Decision needed: option 1, 2 or 3. Nothing is built for it yet.
+- Base: the lightest possible Android base (AOSP) or Linux, running only the processes the user wants.
+- Lua is the interface and lifecycle interpreter, where Kotlin or Java would be on stock Android.
+- Java is on demand: either embedded with our apps, or one shared Java runtime started when the Lua menu or Home
+  screen opens an Android app. Apps that do not need Java never start it.
+- Targets: every device the OS is installed on. The Kindle stays KOReader on its own Linux (no AOSP, no Java).
+- Open: the AOSP route for PC hardware (Android-x86 style builds, a virtual machine, or an own x86 build) and
+  whether it replaces Windows or runs next to it. Not decided.
+
+## 11. Window style and the endless page (declared; title buttons next)
+
+- Every window, in the launcher and on any base, gets a Windows 11 style title bar: minimize, maximize, close.
+  Needs a custom title bar, because the KOReader title bar has one right-hand button. Minimize needs a place
+  for the window to go (the endless page or the window switcher). Maximize and restore toggles the window
+  shape from section 5.
+- One endless page across the whole world: apps are arranged left and right, up and down, and a five-finger pull
+  outward moves along a depth axis (layers of apps in front of and behind each other). Build the flat page
+  first (the Home canvas), depth after. The five-finger gesture may be taken by Android or Samsung before the
+  app sees it: test it on the Galaxy Z Fold 5 first.
+
+## 12. Look: e-ink friendly, One UI style (declared)
+
+- Same ideas as One UI (animation, shadow, depth, flatness), made friendly to e-paper: few redraws, no
+  animation on e-ink, shadows drawn as lines.
+- Default today: 100% black and white, with everything maximized. The user can change it.
+- Colour version with accessible colours, maximized for the viewport of each screen: the OS reads the display's
+  size, colour support and refresh behaviour and fits itself to it. Settings stay adjustable by the user.
+
+## 13. Apps page and app transparency (declared)
+
+- The only page built into the OS repository is `apps`. Only processes the user chose run.
+- Rule: when the user names an application, the OS provides the application itself if they ask for it, or the
+  recompiled free alternative.
+- Transparency settings, per application (including every app written here): meaning not fixed yet. See the
+  open question below.
+
+Open question for the user: what "transparency settings" means. Window see-through level, or a per-app page
+that shows what the app is, where it came from, what it runs and what it can access.
