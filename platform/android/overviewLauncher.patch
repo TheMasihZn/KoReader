@@ -1,0 +1,638 @@
+diff --git a/app/build.gradle b/app/build.gradle
+index e3c32d4..5482d0c 100644
+--- a/app/build.gradle
++++ b/app/build.gradle
+@@ -13,7 +13,8 @@ android {
+     }
+ 
+     defaultConfig {
+-        applicationId "org.koreader.launcher"
++        // Overview build: own app id, so it installs next to official KOReader
++        applicationId "org.koreader.overview"
+         versionName versName
+         minSdkVersion rootProject.ext.minSdk
+         targetSdkVersion rootProject.ext.targetSdk
+diff --git a/app/src/main/AndroidManifest.xml b/app/src/main/AndroidManifest.xml
+index 8f29278..b8ea079 100644
+--- a/app/src/main/AndroidManifest.xml
++++ b/app/src/main/AndroidManifest.xml
+@@ -23,6 +23,10 @@
+         tools:ignore="ScopedStorage" />
+     <uses-permission android:name="android.permission.QUERY_ALL_PACKAGES" />
+ 
++    <!-- Overview: contacts and SMS history for the home screen search -->
++    <uses-permission android:name="android.permission.READ_CONTACTS" />
++    <uses-permission android:name="android.permission.READ_SMS" />
++
+     <application
+         android:name=".MainApp"
+         android:icon="@mipmap/icon"
+@@ -50,6 +54,12 @@
+                 <category android:name="android.intent.category.LAUNCHER" />
+                 <category android:name="android.intent.category.LEANBACK_LAUNCHER" />
+             </intent-filter>
++            <!-- Overview: lets Android offer this app as the Home screen -->
++            <intent-filter>
++                <action android:name="android.intent.action.MAIN" />
++                <category android:name="android.intent.category.HOME" />
++                <category android:name="android.intent.category.DEFAULT" />
++            </intent-filter>
+             <intent-filter>
+                 <action android:name="android.intent.action.VIEW" />
+                 <category android:name="android.intent.category.DEFAULT" />
+@@ -154,6 +164,29 @@
+                 <action android:name="android.intent.action.MAIN" />
+             </intent-filter>
+         </activity>
++        <!-- Overview: records chat messages from notifications -->
++        <service
++            android:name=".overview.MessageListener"
++            android:label="Overview messages"
++            android:exported="false"
++            android:permission="android.permission.BIND_NOTIFICATION_LISTENER_SERVICE">
++            <intent-filter>
++                <action android:name="android.service.notification.NotificationListenerService" />
++            </intent-filter>
++        </service>
++        <!-- Overview: scrolls a chat up to the original message -->
++        <service
++            android:name=".overview.ChatNavigator"
++            android:label="Overview go to message"
++            android:exported="false"
++            android:permission="android.permission.BIND_ACCESSIBILITY_SERVICE">
++            <intent-filter>
++                <action android:name="android.accessibilityservice.AccessibilityService" />
++            </intent-filter>
++            <meta-data
++                android:name="android.accessibilityservice"
++                android:resource="@xml/overview_chat_navigator" />
++        </service>
+         <provider
+             android:name="androidx.core.content.FileProvider"
+             android:authorities="${applicationId}.provider"
+diff --git a/app/src/main/java/org/koreader/launcher/MainActivity.kt b/app/src/main/java/org/koreader/launcher/MainActivity.kt
+index 04b9133..9debdec 100644
+--- a/app/src/main/java/org/koreader/launcher/MainActivity.kt
++++ b/app/src/main/java/org/koreader/launcher/MainActivity.kt
+@@ -632,6 +632,22 @@ class MainActivity : NativeActivity(), LuaInterface,
+         return device.needsWakelocks
+     }
+ 
++    /*---------------------------------------------------------------
++     *     Overview (home screen search), called from Lua over JNI  *
++     *--------------------------------------------------------------*/
++
++    fun overviewDbPath(): String = org.koreader.launcher.overview.Overview.dbPath(this)
++    fun overviewStatus(): String = org.koreader.launcher.overview.Overview.status(this)
++    fun overviewSync() = org.koreader.launcher.overview.Overview.sync(this)
++    fun overviewApps(): String = org.koreader.launcher.overview.Overview.apps(this)
++    fun overviewLaunchApp(pkg: String): Boolean =
++        org.koreader.launcher.overview.Overview.launchApp(this, pkg)
++    fun overviewOpenOriginal(id: Long): Boolean =
++        org.koreader.launcher.overview.Overview.openOriginal(this, id)
++    fun overviewOpenSetup(kind: String) = runOnUiThread {
++        org.koreader.launcher.overview.Overview.openSetup(this, kind)
++    }
++
+     override fun openLink(url: String): Boolean {
+         val webpage = Uri.parse(url)
+         val intent = Intent(Intent.ACTION_VIEW, webpage)
+diff --git a/app/src/main/java/org/koreader/launcher/overview/ChatNavigator.kt b/app/src/main/java/org/koreader/launcher/overview/ChatNavigator.kt
+new file mode 100644
+index 0000000..20b82f7
+--- /dev/null
++++ b/app/src/main/java/org/koreader/launcher/overview/ChatNavigator.kt
+@@ -0,0 +1,118 @@
++package org.koreader.launcher.overview
++
++import android.accessibilityservice.AccessibilityService
++import android.os.Handler
++import android.os.Looper
++import android.view.accessibility.AccessibilityEvent
++import android.view.accessibility.AccessibilityNodeInfo
++import android.widget.Toast
++
++/**
++ * Takes you to the original message inside the other app.
++ *
++ * Overview opens the chat (Instagram, WhatsApp...), then this service reads the chat on
++ * screen and scrolls up until the message text is visible, then puts the accessibility
++ * focus on it. Deterministic text matching, no AI model: cheaper and repeatable.
++ *
++ * It only acts while a target is set, and only inside the target app's package.
++ */
++class ChatNavigator : AccessibilityService() {
++
++    companion object {
++        private const val MAX_SCROLLS = 80
++        private const val STEP_DELAY_MS = 350L
++        private const val GIVE_UP_MS = 45_000L
++
++        @Volatile var instance: ChatNavigator? = null
++            private set
++
++        private data class Target(val packageName: String, val text: String, val startedAt: Long)
++        @Volatile private var target: Target? = null
++
++        /** Called by Overview right before it opens the chat. */
++        fun seek(packageName: String, body: String) {
++            // search a distinctive slice: the first line, at most 60 characters
++            val needle = body.lineSequence().firstOrNull { it.isNotBlank() }?.trim()?.take(60) ?: return
++            target = Target(packageName, needle, System.currentTimeMillis())
++            instance?.scheduleStep()
++        }
++
++        fun isEnabled(): Boolean = instance != null
++    }
++
++    private val handler = Handler(Looper.getMainLooper())
++    private var scrolls = 0
++    private var stepPending = false
++
++    override fun onServiceConnected() {
++        instance = this
++    }
++
++    override fun onDestroy() {
++        instance = null
++        super.onDestroy()
++    }
++
++    override fun onInterrupt() {}
++
++    override fun onAccessibilityEvent(event: AccessibilityEvent) {
++        val t = target ?: return
++        if (event.packageName?.toString() != t.packageName) return
++        scheduleStep()
++    }
++
++    private fun scheduleStep() {
++        if (stepPending) return
++        stepPending = true
++        handler.postDelayed({
++            stepPending = false
++            step()
++        }, STEP_DELAY_MS)
++    }
++
++    private fun step() {
++        val t = target ?: return
++        if (System.currentTimeMillis() - t.startedAt > GIVE_UP_MS) return finish("Message not found in time")
++        val root = rootInActiveWindow ?: return
++        if (root.packageName?.toString() != t.packageName) return
++
++        val hits = root.findAccessibilityNodeInfosByText(t.text)
++        if (hits.isNotEmpty()) {
++            hits.last().performAction(AccessibilityNodeInfo.ACTION_ACCESSIBILITY_FOCUS)
++            return finish(null)
++        }
++        if (scrolls >= MAX_SCROLLS) return finish("Scrolled $MAX_SCROLLS pages, message not found")
++
++        val list = largestScrollable(root) ?: return finish("No scrollable chat on screen")
++        if (list.performAction(AccessibilityNodeInfo.ACTION_SCROLL_BACKWARD)) {
++            scrolls++
++            scheduleStep()
++        } else {
++            finish("Reached the top of the chat, message not found")
++        }
++    }
++
++    private fun largestScrollable(node: AccessibilityNodeInfo): AccessibilityNodeInfo? {
++        var best: AccessibilityNodeInfo? = null
++        var bestArea = 0
++        val queue = ArrayDeque<AccessibilityNodeInfo>()
++        queue.add(node)
++        val r = android.graphics.Rect()
++        while (queue.isNotEmpty()) {
++            val n = queue.removeFirst()
++            if (n.isScrollable) {
++                n.getBoundsInScreen(r)
++                val area = r.width() * r.height()
++                if (area > bestArea) { best = n; bestArea = area }
++            }
++            for (i in 0 until n.childCount) n.getChild(i)?.let { queue.add(it) }
++        }
++        return best
++    }
++
++    private fun finish(problem: String?) {
++        target = null
++        scrolls = 0
++        if (problem != null) Toast.makeText(this, problem, Toast.LENGTH_SHORT).show()
++    }
++}
+diff --git a/app/src/main/java/org/koreader/launcher/overview/MessageListener.kt b/app/src/main/java/org/koreader/launcher/overview/MessageListener.kt
+new file mode 100644
+index 0000000..ecacd1a
+--- /dev/null
++++ b/app/src/main/java/org/koreader/launcher/overview/MessageListener.kt
+@@ -0,0 +1,104 @@
++package org.koreader.launcher.overview
++
++import android.app.Notification
++import android.app.PendingIntent
++import android.content.pm.PackageManager
++import android.os.Build
++import android.os.Bundle
++import android.os.Parcelable
++import android.service.notification.NotificationListenerService
++import android.service.notification.StatusBarNotification
++import android.util.Log
++
++/**
++ * Records every chat message that arrives as a notification (WhatsApp, Telegram,
++ * Instagram, Signal, SMS apps...). Only messages from the moment it is enabled;
++ * Android gives no access to older history this way.
++ *
++ * It also remembers each conversation's "open this chat" intent, so tapping a message
++ * in Overview can jump straight into the original chat.
++ */
++class MessageListener : NotificationListenerService() {
++
++    companion object {
++        private const val TAG = "OverviewListener"
++
++        /** packageName|conversation -> intent that opens that chat. Lost on reboot. */
++        val chatIntents = HashMap<String, PendingIntent>()
++
++        fun key(packageName: String, conversation: String) = "$packageName|$conversation"
++    }
++
++    override fun onNotificationPosted(sbn: StatusBarNotification) {
++        try {
++            record(sbn)
++        } catch (e: Exception) {
++            Log.w(TAG, "could not record notification from ${sbn.packageName}", e)
++        }
++    }
++
++    private fun record(sbn: StatusBarNotification) {
++        val n = sbn.notification ?: return
++        if (sbn.packageName == packageName) return
++        if (n.flags and Notification.FLAG_GROUP_SUMMARY != 0) return
++        val extras = n.extras ?: return
++
++        val messages = messagingStyleMessages(extras)
++        val isChat = messages.isNotEmpty() ||
++            (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP && n.category == Notification.CATEGORY_MESSAGE)
++        if (!isChat) return
++
++        val appName = appLabel(sbn.packageName)
++        val title = extras.getCharSequence(Notification.EXTRA_TITLE)?.toString().orEmpty()
++        val conversation = extras.getCharSequence(Notification.EXTRA_CONVERSATION_TITLE)?.toString()
++            ?.takeIf { it.isNotBlank() } ?: title
++        if (conversation.isBlank()) return
++
++        n.contentIntent?.let { chatIntents[key(sbn.packageName, conversation)] = it }
++
++        val store = OverviewStore.get(this)
++        if (messages.isNotEmpty()) {
++            for (m in messages) {
++                store.addMessage(
++                    appName, sbn.packageName, conversation,
++                    sender = m.sender ?: "me",
++                    body = m.text, time = m.time,
++                    outgoing = m.sender == null,
++                    source = "notification",
++                )
++            }
++        } else {
++            val text = extras.getCharSequence(Notification.EXTRA_TEXT)?.toString().orEmpty()
++            store.addMessage(appName, sbn.packageName, conversation, title, text, sbn.postTime, false, "notification")
++        }
++    }
++
++    private data class ChatLine(val sender: String?, val text: String, val time: Long)
++
++    /** Reads Notification.MessagingStyle history straight from the extras bundle (API 24+). */
++    private fun messagingStyleMessages(extras: Bundle): List<ChatLine> {
++        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.N) return emptyList()
++        @Suppress("DEPRECATION")
++        val raw: Array<Parcelable> = extras.getParcelableArray(Notification.EXTRA_MESSAGES) ?: return emptyList()
++        return raw.mapNotNull { p ->
++            val b = p as? Bundle ?: return@mapNotNull null
++            val text = b.getCharSequence("text")?.toString() ?: return@mapNotNull null
++            val time = b.getLong("time", System.currentTimeMillis())
++            // "sender" is a CharSequence on API 24-27; from API 28 a Person in "sender_person"
++            var sender = b.getCharSequence("sender")?.toString()
++            if (sender == null && Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
++                @Suppress("DEPRECATION")
++                val person = b.getParcelable<android.app.Person>("sender_person")
++                sender = person?.name?.toString()
++            }
++            ChatLine(sender, text, time)
++        }
++    }
++
++    private fun appLabel(pkg: String): String = try {
++        val pm = packageManager
++        pm.getApplicationLabel(pm.getApplicationInfo(pkg, 0)).toString()
++    } catch (e: PackageManager.NameNotFoundException) {
++        pkg
++    }
++}
+diff --git a/app/src/main/java/org/koreader/launcher/overview/Overview.kt b/app/src/main/java/org/koreader/launcher/overview/Overview.kt
+new file mode 100644
+index 0000000..2f6abb0
+--- /dev/null
++++ b/app/src/main/java/org/koreader/launcher/overview/Overview.kt
+@@ -0,0 +1,168 @@
++package org.koreader.launcher.overview
++
++import android.Manifest
++import android.app.Activity
++import android.content.ComponentName
++import android.content.Intent
++import android.content.pm.PackageManager
++import android.net.Uri
++import android.os.Build
++import android.provider.ContactsContract
++import android.provider.Settings
++import android.provider.Telephony
++import android.util.Log
++import androidx.core.app.ActivityCompat
++import androidx.core.content.ContextCompat
++import java.util.concurrent.Executors
++
++/**
++ * Everything the Lua side of Overview asks Android for.
++ * MainActivity exposes these as plain methods so Lua can reach them over JNI.
++ */
++object Overview {
++    private const val TAG = "Overview"
++    private const val PERMISSIONS_ID = 42
++    private val worker = Executors.newSingleThreadExecutor()
++
++    fun dbPath(activity: Activity): String {
++        OverviewStore.get(activity).writableDatabase // creates the file and tables
++        return OverviewStore.path(activity)
++    }
++
++    /** "listener=1;navigator=0;contacts=1;sms=1" so Lua can show what is still off. */
++    fun status(activity: Activity): String {
++        fun granted(p: String) = if (ContextCompat.checkSelfPermission(activity, p) == PackageManager.PERMISSION_GRANTED) 1 else 0
++        val listeners = Settings.Secure.getString(activity.contentResolver, "enabled_notification_listeners").orEmpty()
++        val listener = if (listeners.contains(ComponentName(activity, MessageListener::class.java).flattenToString())) 1 else 0
++        val navigator = if (ChatNavigator.isEnabled()) 1 else 0
++        return "listener=$listener;navigator=$navigator;contacts=${granted(Manifest.permission.READ_CONTACTS)};sms=${granted(Manifest.permission.READ_SMS)}"
++    }
++
++    /** kind: "listener", "navigator" or "permissions". */
++    fun openSetup(activity: Activity, kind: String) {
++        when (kind) {
++            "listener" -> activity.startActivity(Intent("android.settings.ACTION_NOTIFICATION_LISTENER_SETTINGS"))
++            "navigator" -> activity.startActivity(Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS))
++            "permissions" -> ActivityCompat.requestPermissions(
++                activity, arrayOf(Manifest.permission.READ_CONTACTS, Manifest.permission.READ_SMS), PERMISSIONS_ID)
++        }
++    }
++
++    /** Copies contacts and SMS history into the shared database, off the UI thread. */
++    fun sync(activity: Activity) {
++        val context = activity.applicationContext
++        worker.execute {
++            try {
++                importContacts(context)
++                importSms(context)
++            } catch (e: Exception) {
++                Log.w(TAG, "sync failed", e)
++            }
++        }
++    }
++
++    private fun importContacts(context: android.content.Context) {
++        if (ContextCompat.checkSelfPermission(context, Manifest.permission.READ_CONTACTS) != PackageManager.PERMISSION_GRANTED) return
++        val phones = HashMap<Long, MutableList<String>>()
++        context.contentResolver.query(
++            ContactsContract.CommonDataKinds.Phone.CONTENT_URI,
++            arrayOf(ContactsContract.CommonDataKinds.Phone.CONTACT_ID, ContactsContract.CommonDataKinds.Phone.NUMBER),
++            null, null, null
++        )?.use { c ->
++            while (c.moveToNext()) phones.getOrPut(c.getLong(0)) { mutableListOf() }.add(c.getString(1) ?: continue)
++        }
++        val db = OverviewStore.get(context).writableDatabase
++        db.beginTransaction()
++        try {
++            db.delete("contacts", null, null)
++            context.contentResolver.query(
++                ContactsContract.Contacts.CONTENT_URI,
++                arrayOf(ContactsContract.Contacts._ID, ContactsContract.Contacts.DISPLAY_NAME),
++                null, null, null
++            )?.use { c ->
++                while (c.moveToNext()) {
++                    val id = c.getLong(0)
++                    val name = c.getString(1) ?: continue
++                    db.execSQL("INSERT OR REPLACE INTO contacts(id, name, phones) VALUES (?, ?, ?)",
++                        arrayOf(id, name, phones[id]?.joinToString(", ").orEmpty()))
++                }
++            }
++            db.setTransactionSuccessful()
++        } finally {
++            db.endTransaction()
++        }
++    }
++
++    private fun importSms(context: android.content.Context) {
++        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.KITKAT) return
++        if (ContextCompat.checkSelfPermission(context, Manifest.permission.READ_SMS) != PackageManager.PERMISSION_GRANTED) return
++        val store = OverviewStore.get(context)
++        val names = HashMap<String, String>()
++        fun nameFor(address: String): String = names.getOrPut(address) {
++            if (ContextCompat.checkSelfPermission(context, Manifest.permission.READ_CONTACTS) != PackageManager.PERMISSION_GRANTED) return@getOrPut address
++            val uri = Uri.withAppendedPath(ContactsContract.PhoneLookup.CONTENT_FILTER_URI, Uri.encode(address))
++            context.contentResolver.query(uri, arrayOf(ContactsContract.PhoneLookup.DISPLAY_NAME), null, null, null)
++                ?.use { c -> if (c.moveToFirst()) c.getString(0) else null } ?: address
++        }
++        val db = store.writableDatabase
++        db.beginTransaction()
++        try {
++            context.contentResolver.query(
++                Telephony.Sms.CONTENT_URI,
++                arrayOf(Telephony.Sms.ADDRESS, Telephony.Sms.BODY, Telephony.Sms.DATE, Telephony.Sms.TYPE),
++                null, null, null
++            )?.use { c ->
++                while (c.moveToNext()) {
++                    val address = c.getString(0) ?: continue
++                    val outgoing = c.getInt(3) == Telephony.Sms.MESSAGE_TYPE_SENT
++                    val name = nameFor(address)
++                    store.addMessage("SMS", "sms", name, if (outgoing) "me" else name,
++                        c.getString(1).orEmpty(), c.getLong(2), outgoing, "sms", address)
++                }
++            }
++            db.setTransactionSuccessful()
++        } finally {
++            db.endTransaction()
++        }
++    }
++
++    /** Opens the chat that holds message [id] and asks ChatNavigator to scroll to it. */
++    fun openOriginal(activity: Activity, id: Long): Boolean {
++        val m = OverviewStore.get(activity).findMessage(id) ?: return false
++        if (m.source == "sms" && m.address != null) {
++            return start(activity, Intent(Intent.ACTION_VIEW, Uri.parse("smsto:${m.address}")))
++        }
++        ChatNavigator.seek(m.packageName, m.body)
++        MessageListener.chatIntents[MessageListener.key(m.packageName, m.conversation)]?.let {
++            try {
++                it.send()
++                return true
++            } catch (e: Exception) {
++                Log.i(TAG, "chat intent expired, opening the app instead")
++            }
++        }
++        return launchApp(activity, m.packageName)
++    }
++
++    /** "label\tpackage\n" for every app with a launcher icon. */
++    fun apps(activity: Activity): String {
++        val pm = activity.packageManager
++        val intent = Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_LAUNCHER)
++        return pm.queryIntentActivities(intent, 0)
++            .filter { it.activityInfo.packageName != activity.packageName }
++            .joinToString("\n") { "${it.loadLabel(pm)}\t${it.activityInfo.packageName}" }
++    }
++
++    fun launchApp(activity: Activity, pkg: String): Boolean {
++        val intent = activity.packageManager.getLaunchIntentForPackage(pkg) ?: return false
++        return start(activity, intent)
++    }
++
++    private fun start(activity: Activity, intent: Intent): Boolean = try {
++        activity.startActivity(intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
++        true
++    } catch (e: Exception) {
++        Log.w(TAG, "cannot start $intent", e)
++        false
++    }
++}
+diff --git a/app/src/main/java/org/koreader/launcher/overview/OverviewStore.kt b/app/src/main/java/org/koreader/launcher/overview/OverviewStore.kt
+new file mode 100644
+index 0000000..63b2521
+--- /dev/null
++++ b/app/src/main/java/org/koreader/launcher/overview/OverviewStore.kt
+@@ -0,0 +1,99 @@
++package org.koreader.launcher.overview
++
++import android.content.ContentValues
++import android.content.Context
++import android.database.sqlite.SQLiteDatabase
++import android.database.sqlite.SQLiteOpenHelper
++
++/**
++ * One SQLite file shared by the Android side (writes) and the Lua side (reads).
++ * Lua opens the same file through lua-ljsqlite3; WAL mode lets both work at once.
++ *
++ * messages: one row per chat message, from any app (notifications, SMS).
++ * contacts: one row per phone contact.
++ */
++class OverviewStore private constructor(context: Context) :
++    SQLiteOpenHelper(context, FILE_NAME, null, VERSION) {
++
++    companion object {
++        const val FILE_NAME = "overview.sqlite"
++        private const val VERSION = 1
++
++        @Volatile private var instance: OverviewStore? = null
++
++        fun get(context: Context): OverviewStore =
++            instance ?: synchronized(this) {
++                instance ?: OverviewStore(context.applicationContext).also { instance = it }
++            }
++
++        fun path(context: Context): String = context.getDatabasePath(FILE_NAME).absolutePath
++    }
++
++    override fun onConfigure(db: SQLiteDatabase) {
++        db.enableWriteAheadLogging()
++    }
++
++    override fun onCreate(db: SQLiteDatabase) {
++        db.execSQL("""
++            CREATE TABLE messages (
++                id           INTEGER PRIMARY KEY AUTOINCREMENT,
++                appName      TEXT NOT NULL,
++                packageName  TEXT NOT NULL,
++                conversation TEXT NOT NULL,
++                sender       TEXT NOT NULL,
++                body         TEXT NOT NULL,
++                time         INTEGER NOT NULL,
++                outgoing     INTEGER NOT NULL DEFAULT 0,
++                source       TEXT NOT NULL,
++                address      TEXT
++            )""")
++        // the same message arrives again every time a chat notification is updated
++        db.execSQL("CREATE UNIQUE INDEX messagesUnique ON messages(packageName, conversation, sender, body, time)")
++        db.execSQL("CREATE INDEX messagesTime ON messages(time)")
++        db.execSQL("""
++            CREATE TABLE contacts (
++                id     INTEGER PRIMARY KEY,
++                name   TEXT NOT NULL,
++                phones TEXT NOT NULL DEFAULT ''
++            )""")
++    }
++
++    override fun onUpgrade(db: SQLiteDatabase, oldVersion: Int, newVersion: Int) {}
++
++    fun addMessage(
++        appName: String, packageName: String, conversation: String, sender: String,
++        body: String, time: Long, outgoing: Boolean, source: String, address: String? = null,
++    ) {
++        if (body.isBlank()) return
++        val values = ContentValues().apply {
++            put("appName", appName)
++            put("packageName", packageName)
++            put("conversation", conversation)
++            put("sender", sender)
++            put("body", body)
++            put("time", time)
++            put("outgoing", if (outgoing) 1 else 0)
++            put("source", source)
++            put("address", address)
++        }
++        writableDatabase.insertWithOnConflict("messages", null, values, SQLiteDatabase.CONFLICT_IGNORE)
++    }
++
++    fun findMessage(id: Long): StoredMessage? {
++        readableDatabase.rawQuery(
++            "SELECT packageName, conversation, body, source, address FROM messages WHERE id = ?",
++            arrayOf(id.toString())
++        ).use { c ->
++            if (!c.moveToFirst()) return null
++            return StoredMessage(c.getString(0), c.getString(1), c.getString(2), c.getString(3), c.getString(4))
++        }
++    }
++
++    data class StoredMessage(
++        val packageName: String,
++        val conversation: String,
++        val body: String,
++        val source: String,
++        val address: String?,
++    )
++}
+diff --git a/app/src/main/res/values/strings.xml b/app/src/main/res/values/strings.xml
+index 8a12f64..560be0c 100644
+--- a/app/src/main/res/values/strings.xml
++++ b/app/src/main/res/values/strings.xml
+@@ -15,4 +15,5 @@
+ 
+     <!-- don't translate -->
+     <string name="unicode_bomb" translatable="false">💣</string>
++    <string name="overview_navigator_description">Overview uses this to open a chat and scroll up to the message you tapped. It reads the screen only while it is looking for that message. It can see everything on screen, passwords included, so turn it off if you stop using it.</string>
+ </resources>
+diff --git a/app/src/main/res/xml/overview_chat_navigator.xml b/app/src/main/res/xml/overview_chat_navigator.xml
+new file mode 100644
+index 0000000..9503d97
+--- /dev/null
++++ b/app/src/main/res/xml/overview_chat_navigator.xml
+@@ -0,0 +1,10 @@
++<?xml version="1.0" encoding="utf-8"?>
++<!-- Overview "go to message": reads chat screens and scrolls them; acts only while a target is set -->
++<accessibility-service xmlns:android="http://schemas.android.com/apk/res/android"
++    android:accessibilityEventTypes="typeWindowStateChanged|typeWindowContentChanged|typeViewScrolled"
++    android:accessibilityFeedbackType="feedbackGeneric"
++    android:accessibilityFlags="flagReportViewIds|flagRetrieveInteractiveWindows"
++    android:canRetrieveWindowContent="true"
++    android:canPerformGestures="false"
++    android:notificationTimeout="200"
++    android:description="@string/overview_navigator_description" />

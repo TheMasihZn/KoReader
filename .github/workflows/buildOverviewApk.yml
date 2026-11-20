@@ -1,0 +1,72 @@
+# Builds the Overview APK (KOReader as the Android home screen) for 64-bit ARM phones
+# and publishes it as a GitHub Release, so Obtainium on the phone can install updates.
+#
+# The Android-side changes live in platform/android/overviewLauncher.patch and are applied
+# to the upstream luajit-launcher submodule here, so this repository stays the only one
+# to maintain. Nothing from KOReader is removed.
+
+name: Build Overview APK
+
+on:
+  push:
+    branches: [overviewLauncher]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: overviewApk
+  cancel-in-progress: true
+
+jobs:
+  apk:
+    name: Overview APK (arm64)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 300
+    env:
+      CI: 'true'
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          fetch-tags: true
+
+      - name: Checkout submodules
+        run: git submodule update --depth 1 --init --jobs 4 --recursive
+
+      - name: Apply the Overview changes to the Android launcher
+        run: git -C platform/android/luajit-launcher apply ../overviewLauncher.patch
+
+      - name: Cache third-party downloads and build
+        uses: actions/cache@v4
+        with:
+          path: |
+            base/thirdparty/*/build
+            base/build
+          key: overviewApk-${{ hashFiles('base/Makefile', 'base/thirdparty/*/CMakeLists.txt') }}
+
+      - name: Start KOReader's Android build container
+        run: ./kodev docker create koreader/koandroid:6.0.0-22.04 --name=kontainer
+
+      - name: Build APK
+        run: ./kodev docker kontainer exec env ANDROID_FLAVOR=Fdroid PARALLEL_JOBS=4 ./kodev release --ignore-translation android-arm64
+
+      - name: Name the APK
+        id: apk
+        run: |
+          apk="$(ls koreader-android-arm64*.apk | head -n1)"
+          tag="overview-$(date -u +%Y%m%d-%H%M)-${GITHUB_SHA::7}"
+          mv "$apk" "overview-${tag#overview-}.apk"
+          echo "file=overview-${tag#overview-}.apk" >> "$GITHUB_OUTPUT"
+          echo "tag=$tag" >> "$GITHUB_OUTPUT"
+
+      - name: Publish release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "${{ steps.apk.outputs.tag }}" "${{ steps.apk.outputs.file }}" \
+            --target "$GITHUB_SHA" \
+            --title "Overview ${{ steps.apk.outputs.tag }}" \
+            --notes "Built from ${GITHUB_SHA} on branch ${GITHUB_REF_NAME}. Changes: see uiLedger.md."
