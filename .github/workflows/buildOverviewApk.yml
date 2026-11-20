@@ -53,6 +53,25 @@ jobs:
       - name: Build APK
         run: ./kodev docker kontainer exec env ANDROID_FLAVOR=Fdroid PARALLEL_JOBS=4 ./kodev release --ignore-translation android-arm64
 
+      # Signs with your own key when the two repository secrets exist
+      # (Settings > Secrets and variables > Actions). Without them the APK keeps
+      # uber-apk-signer's public test key, which anyone can sign updates with.
+      - name: Sign with the Overview key
+        env:
+          KEYSTORE_BASE64: ${{ secrets.OVERVIEW_KEYSTORE_BASE64 }}
+          KEYSTORE_PASSWORD: ${{ secrets.OVERVIEW_KEYSTORE_PASSWORD }}
+        run: |
+          if [ -z "$KEYSTORE_BASE64" ]; then
+            echo "::warning::OVERVIEW_KEYSTORE_BASE64 not set: APK is signed with the public test key"
+            exit 0
+          fi
+          printf '%s' "$KEYSTORE_BASE64" | base64 -d > overviewSigning.jks
+          ./kodev docker kontainer exec uber-apk-signer \
+            --ks overviewSigning.jks --ksAlias overview \
+            --ksPass "$KEYSTORE_PASSWORD" --ksKeyPass "$KEYSTORE_PASSWORD" \
+            --allowResign --overwrite --apks koreader-android-arm64*.apk
+          rm -f overviewSigning.jks koreader-android-arm64*.apk.idsig
+
       - name: Name the APK
         id: apk
         run: |
