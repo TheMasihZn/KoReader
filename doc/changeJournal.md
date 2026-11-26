@@ -12,3 +12,4 @@ One line per step: when, commit, what, branch. Written by tools/kosBundle/journa
 - 2026-11-17T09:52Z `887d986` gesture forwarding through full-screen menus (Collections) (branch kosNine)
 - 2026-11-17T09:53Z `aec60af` 0.5.0: terminal minimize, keyboard model, touch menu, docs, version (branch kosNine)
 - 2026-11-17T09:54Z `1c10a2a` tests copied into tests/kos with run.sh (branch kosNine)
+- 2026-11-26T05:23Z `cbf4ec1` pushed all branches and tags to GitHub (TheMasihZn/koreader) (branch kosPreview)
